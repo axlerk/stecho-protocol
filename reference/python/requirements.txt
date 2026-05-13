@@ -1,0 +1,5 @@
+jpeglib>=1.0
+conseal>=2025.11
+cryptography>=42.0
+Pillow>=10.0
+numpy>=1.26

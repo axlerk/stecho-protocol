@@ -1,0 +1,57 @@
+{
+  "generator": "spec/reference/python/generate_test_vectors.py",
+  "spec_version": "juniward-layer + open-v1 + stealth-v1",
+  "notes": "Initial vectors emitted by the Python reference encoder. The shipping Swift engine will re-emit equivalent vectors from its own test suite once available. The Python decoder must read vectors from either source.",
+  "vectors": [
+    {
+      "name": "open-text-hello-ascii",
+      "jpeg": "open-text-hello-ascii.jpg",
+      "carrier_size": "256x256 synthetic",
+      "mode": "open",
+      "password": null,
+      "type": "text",
+      "body_base64": "aGVsbG8gd29ybGQ=",
+      "notes": "Smallest open-mode vector: tiny ASCII payload."
+    },
+    {
+      "name": "open-empty",
+      "jpeg": "open-empty.jpg",
+      "carrier_size": "256x256 synthetic",
+      "mode": "open",
+      "password": null,
+      "type": "text",
+      "body_base64": "",
+      "notes": "Zero-length open-mode payload — header only, all padding."
+    },
+    {
+      "name": "stealth-text-hello-ascii",
+      "jpeg": "stealth-text-hello-ascii.jpg",
+      "carrier_size": "256x256 synthetic",
+      "mode": "stealth",
+      "password": "correct horse battery staple",
+      "type": "text",
+      "body_base64": "aGVsbG8gd29ybGQ=",
+      "notes": "Smallest stealth-mode vector."
+    },
+    {
+      "name": "stealth-text-unicode",
+      "jpeg": "stealth-text-unicode.jpg",
+      "carrier_size": "256x256 synthetic",
+      "mode": "stealth",
+      "password": "пар0ль",
+      "type": "text",
+      "body_base64": "0J/RgNC40LLQtdGCLCBTdGVjaG8hIPCfkYs=",
+      "notes": "UTF-8 body with Cyrillic + emoji and a non-ASCII password."
+    },
+    {
+      "name": "stealth-audio-binary",
+      "jpeg": "stealth-audio-binary.jpg",
+      "carrier_size": "256x256 synthetic",
+      "mode": "stealth",
+      "password": "voice-test",
+      "type": "audio",
+      "body_base64": "UP4PgK4LIvG+6UJ/7AGCmIB+CVCaw7uWLIFYdUlMybbw4+Lw1uHrPpFFvIzyK0yhFjkJze8hKEM+1mAilZ0WZb9UI8WjqPmnGhXJGJ1LstuxrUd8W1qlNCxxag1H3dn76qF2HN9zdy/eGxoef/Xtq6KLNot9BJv9LzBC7kCJzNRpjsuxAsc/wPn0yTFcDovWcTMw+BUmLOonKnlxJMTqD/7rtvketWaleEZMn+XAwVMWBBo6Hi545fmXS+cuapkRq3251gcljYc=",
+      "notes": "200 bytes of pseudo-random bytes labeled as audio — stands in for real Opus."
+    }
+  ]
+}
