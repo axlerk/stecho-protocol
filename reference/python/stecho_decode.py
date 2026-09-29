@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Pavel Khudiakov
 """
 Reference decoder for the Stecho v1 wire format
 (`juniward-layer.md` + `open-v1.md` + `stealth-v1.md`).

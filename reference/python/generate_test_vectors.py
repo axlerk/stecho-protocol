@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Pavel Khudiakov
 """Generate the initial batch of Stecho v1 test vectors.
 
 Run once; commit the outputs. When the Swift engine has a vector-emitting

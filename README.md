@@ -77,3 +77,23 @@ JPEG bytes from any source. For the shipping iOS app's actual transport
 empirical findings behind that choice, see
 [`../docs/experiment-jpeg-imessage-survival.md`](../docs/experiment-jpeg-imessage-survival.md)
 and [`THREAT_MODEL.md`](THREAT_MODEL.md) §4.3.
+
+## License
+
+| What | License | Text |
+|------|---------|------|
+| Reference decoder (`reference/`) | Apache-2.0 | [`LICENSE`](LICENSE) |
+| Specification text (`*.md` in this directory) | CC BY 4.0 | [`LICENSE-DOCS`](LICENSE-DOCS) |
+| [`THREAT_MODEL.md`](THREAT_MODEL.md) | CC BY 4.0 | [`LICENSE-DOCS`](LICENSE-DOCS) |
+| Test vectors (`test-vectors/`) | CC BY 4.0 | [`LICENSE-DOCS`](LICENSE-DOCS) |
+| Swift cost-map port (`reference/swift/JUNIWARDCost.swift`, derived from conseal) | MPL-2.0 | [`reference/swift/LICENSE-MPL-2.0`](reference/swift/LICENSE-MPL-2.0) |
+| `legal/` (privacy policy, support page) | not covered — all rights reserved | — |
+
+The Python reference decoder imports [conseal](https://github.com/uibk-uncover/conseal)
+(MPL-2.0) at run time as a dependency; no conseal code is copied into it. The Swift
+cost-map port, by contrast, is derived from conseal's code and therefore stays
+under MPL-2.0 (see the table).
+
+Copyright 2026 Pavel Khudiakov (OneGoodMan Studio); see [`NOTICE`](NOTICE).
+Re-implementing the format in another language is exactly what this
+repository is for — no permission needed, attribution appreciated.

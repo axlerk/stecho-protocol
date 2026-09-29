@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Pavel Khudiakov
 """Verify the Python reference decoder against the committed test vectors.
 
 Usage:
