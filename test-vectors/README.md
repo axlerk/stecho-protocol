@@ -71,10 +71,27 @@ tables and embedded with SI-UNIWARD. Audio bodies are pseudo-random bytes
 labelled `audio`, not real Opus (the Opus container is outside the spec,
 layer O5).
 
-The Swift test copy in `StechoTests/Fixtures/` still holds only the v1
-set. When the Swift v2 engine lands, copy the `v2-*` files and the
-manifest there; until it decodes v2, `CrossImplVectorsTests` should skip
-entries whose `layer` is not `v1`.
+The Swift test copy in `StechoTests/Fixtures/` holds the v1 and v2 sets
+and the manifest; `CrossImplVectorsTests` decodes every entry with the
+shipping Swift dispatch and checks mode, layer, rung and body, and that
+stealth entries open neither without their password nor with a wrong one.
+
+### Swift-emitted layer v2 (`swift-v2/`)
+
+The other direction: carriers made by the Swift encoder
+(`JUNIWARModeV2.encode`, the app's engine), with their own
+`swift-v2/manifest.json` in the same schema, for the Python decoder.
+Emitted by `StechoTests/SwiftV2VectorEmitterTests.swift`
+(`TEST_RUNNER_EMIT_V2_VECTORS=<dir> scripts/test.sh
+-only-testing:StechoTests/SwiftV2VectorEmitterTests`) on synthetic
+carriers: J-UNIWARD on ImageIO / UIImage q0.85 JPEGs (one with partial
+MCUs, one grayscale) and SI-UNIWARD on `SideInformedEncoder`'s own
+quantisation (the send path), both modes, rungs 1–5.
+
+```bash
+cd ../reference/python
+python verify_test_vectors.py ../../test-vectors/swift-v2
+```
 
 ## Why vectors are committed as binary
 

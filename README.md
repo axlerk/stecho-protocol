@@ -28,7 +28,7 @@ described here, that is a bug.
 | [`open-v1.md`](open-v1.md)               | Open mode on layer v1 (frozen; readable). |
 | [`stealth-v1.md`](stealth-v1.md)         | Stealth mode on layer v1 (frozen; readable). |
 | [`reference/python/`](reference/python/) | Independent Python reference encoder and decoder for v1 and v2. Run it against `test-vectors/` to verify your decoder is bit-compatible. |
-| [`test-vectors/`](test-vectors/)         | Known JPEGs + passwords + expected `(type, body)`, v1 and v2 (each entry names its layer; v2 entries also the rung). Emitted by the Python encoder; the Swift decoder reads the v1 set on every CI build (`CrossImplVectorsTests`); the v2 set is for the Swift v2 engine. |
+| [`test-vectors/`](test-vectors/)         | Known JPEGs + passwords + expected `(type, body)`, v1 and v2 (each entry names its layer; v2 entries also the rung). Emitted by the Python encoder; the Swift decoder reads both sets (`CrossImplVectorsTests`). `test-vectors/swift-v2/` holds v2 carriers emitted by the Swift encoder, for the Python decoder. |
 
 ## Stability
 
