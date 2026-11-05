@@ -20,11 +20,14 @@ via J-UNIWARD content-adaptive distortion + Syndrome-Trellis Codes
 through iMessage as a regular image attachment. **What it protects:**
 message content (unreadable without the password) and the wire profile
 (no magic bytes, no plaintext length, constant embedding rate per
-carrier). **What it does not:** trained CNN-class steganalysis can
-detect that *some* J-UNIWARD modification happened (without recovering
-the message); a compromised device, a forensic Keychain dump,
-screenshots, or iMessage recompression all defeat or destroy the
-payload. **Open mode** (no password) is publicly readable by anyone
+carrier). **What it does not:** hide the *fact* that a photo carries
+a message. A published statistical test with no training tells today's
+(v1) stealth carriers from ordinary photos at AUC 0.98-1.00 (measured on
+simulator carriers, real iPhone photos included, §4.1), without
+recovering the message; Messages also labels photos sent from the
+extension "From Stecho" (§4.8). A compromised device, a forensic
+Keychain dump, screenshots, or iMessage recompression all defeat or
+destroy the payload. **Open mode** (no password) is publicly readable by anyone
 with Stecho and is not a privacy feature. **No forward secrecy:** a
 password leak retroactively decrypts every prior message under that
 password. Read the rest before relying on Stecho for anything serious.
@@ -38,10 +41,14 @@ PBKDF2-SHA256-600k) и прячет шифротекст в квантованн
 защищает:** содержимое сообщения (нечитаемо без пароля) и профиль на
 проводе (никаких магических байт, никакой plaintext-длины, скорость
 встраивания постоянна для данного носителя). **Чего не защищает:**
-обученный CNN-стегоанализ видит *сам факт* J-UNIWARD-модификации (без
-чтения сообщения); компрометация устройства, форензик-дамп Keychain,
-скриншоты и пережатие iMessage — всё это либо обходит, либо
-уничтожает payload. **Открытый режим** (без пароля) читается любым, у
+*сам факт* того, что в фото что-то спрятано. Опубликованный
+статистический тест без всякого обучения отличает нынешние (v1)
+stealth-фото от обычных с AUC 0.98-1.00 (измерено на носителях из
+симулятора, включая реальные фото с iPhone, §4.1), не читая
+сообщения; кроме того, Messages подписывает фото, отправленные из
+расширения, как «From Stecho» (§4.8). Компрометация устройства,
+форензик-дамп Keychain, скриншоты и пережатие iMessage — всё это либо
+обходит, либо уничтожает payload. **Открытый режим** (без пароля) читается любым, у
 кого есть Stecho, — это не приватность. **Forward secrecy нет:**
 утечка пароля ретроактивно расшифровывает все предыдущие сообщения
 под этим паролем. Прочитайте дальше, прежде чем полагаться на Stecho
@@ -55,12 +62,15 @@ text inside JPEG photos and ships them through Apple's iMessage as
 ordinary image attachments. There are two modes:
 
 > **Note on transport.** Carriers are shipped as ordinary iMessage
-> image attachments (`MSConversation.insertAttachment`). The
-> alternative — `MSSticker` objects — aggressively re-encodes and is
-> incompatible with any steganography. This is **observed platform
-> behaviour, not a security guarantee**; the recompression failure
-> mode is covered in §6.3 below. See
-> [`docs/experiment-jpeg-imessage-survival.md`](docs/experiment-jpeg-imessage-survival.md)
+> image attachments (`MSConversation.insertAttachment`), encoded with
+> Apple's "Apple Wide Color Sharing Profile" (or plain sRGB when the photo
+> has no colours outside sRGB). iMessage re-encodes any
+> photo tagged Display P3 before delivery, which destroys the payload;
+> a carrier already in the sharing profile goes through byte for byte.
+> `MSSticker` objects and `MSMessage` layouts are re-encoded regardless.
+> This is **observed platform behaviour, not a security guarantee**;
+> the recompression failure mode is covered in §4.3 below. See
+> [`docs/experiment-device-transport.md`](docs/experiment-device-transport.md)
 > for what has been empirically verified.
 
 - **Open mode** ([`spec/open-v1.md`](spec/open-v1.md)) — no password.
@@ -153,9 +163,13 @@ from per-image modification statistics.
 
 Modifications concentrate in textured, high-entropy image regions
 where the J-UNIWARD distortion cost is low, and avoid smooth or
-predictable regions. This resists detectors that key on uniform-
-region histogram perturbations (classical chi-squared, calibration-
-aware methods).
+predictable regions. This defeats the pairs-of-values chi-square test
+(AUC 0.50-0.53 on every carrier measured). It does **not** defeat
+calibration-based tests at v1's rate: the stock F5 calibration attack
+scores AUC 0.960 and an adapted one 0.980 on 150 wallpaper and synthetic
+sources, and both score 1.000 on 5 real iPhone photos (2026-11-03,
+[`docs/experiment-steganalysis.md`](docs/experiment-steganalysis.md) §3 and §7). The cause is the full-stream rate, not the cost
+function; see §4.1.
 
 ## 3. What Open Mode Defends
 
@@ -180,7 +194,7 @@ mode protects anything beyond casual reading of the photo.
 
 ## 4. What Stecho Does NOT Defend
 
-### 4.1 Trained CNN-class steganalysis
+### 4.1 Steganalysis: detecting that a photo carries a message
 
 J-UNIWARD's content-adaptive distortion is the academic state of the
 art for JPEG embedding, but it is not undetectable. Modern detectors
@@ -190,38 +204,88 @@ test corpora (BOSSbase, ALASKA II). These figures are recalled from
 the academic literature and have not been independently measured by
 Stecho.
 
-**An adversary with a steganalysis-trained CNN classifier can, with
-non-trivial probability, distinguish a Stecho photo from an ordinary
-photo without recovering the content.** Stecho does not claim
-otherwise. Content confidentiality (AES-GCM) is unaffected — even a
-positive classification doesn't reveal what was hidden — but the
-*fact* of hiding may be exposed.
+**An adversary who runs a published statistical test can tell a v1
+Stecho photo from an ordinary photo without recovering the content.**
+No CNN and no training are needed (measured below). Content
+confidentiality (AES-GCM) is unaffected — even a positive
+classification doesn't reveal what was hidden — but the *fact* of
+hiding is exposed.
 
-Realistic adversaries with this capability are state-level signal
-intelligence agencies and academic stegoanalysis labs. They are not
-the bulk of phone-search scenarios (border control, intimate
-relationships, employer / school administration), which typically
-rely on format-fingerprint detection — a class of attack Stecho
-specifically defeats.
+This capability is not limited to state-level agencies or academic
+labs: the test is the 2002 F5 calibration attack, a few dozen lines of
+numpy, so anyone who can run a published attack on a photo has it. What
+Stecho does defeat is format-fingerprint detection (§2.3). Layer v2
+([`docs/proposal-layer-v2.md`](docs/proposal-layer-v2.md)) is designed
+to lower these numbers with a variable, capped rate; v1 is what ships
+today, and nothing in this section is measured on v2.
 
-> **What we have measured.** Nothing. The detection numbers above are
-> from published literature on academic test corpora. Real-world
-> detection on iPhone-photo carriers (which are 24 MP color, far from
-> BOSSbase's 512×512 grayscale distribution) is likely lower than
-> academic numbers — but we have not formally measured it. Treat the
-> 70-78% as worst-case upper bound, not a guarantee.
+> **What we have measured** (2026-11-03,
+> [`docs/experiment-steganalysis.md`](docs/experiment-steganalysis.md)).
+> Conditions:
+> - v1 carriers from the real engine at the product settings (2048 px,
+>   quality 0.85, full stream), emitted in the simulator, not sent.
+> - 150 sources: 102 crops of 17 macOS wallpapers (one of them a camera
+>   photo) and 48 synthetic images.
+> - The cover is the same source re-encoded without a payload.
+>
+> Stealth carrier vs cover:
+> - An untrained calibration test (F5-attack family): AUC 0.980 (0.997 at
+>   quality 0.75).
+> - DCTR features + FLD ensemble, 5-fold by source: AUC 0.972, P_E 0.074
+>   (0.980 / 0.090 at 0.75).
+>
+> The embedding load is 0.64 bits per non-zero AC coefficient on the
+> wallpaper crops and 0.17 on the synthetic images.
+>
+> **Real iPhone photos** (2026-11-03, same doc §7). Conditions as above,
+> on 5 everyday iPhone 15 Pro photos without people (full frame as
+> HEIC + 9 crops each, 50 sources, 5 independent scenes); DCTR trained on
+> the 150 sources above plus the other 4 photos. Stealth carrier vs cover:
+> - The untrained calibration test: AUC 1.000 (1.000 at quality 0.75).
+> - DCTR + FLD: AUC 0.937 (0.995 at 0.75).
+> - The load is 0.34 bits per non-zero AC coefficient; almost no zero
+>   coefficients are forced (0.2 % of changes).
+> - If the stream were only partly filled (v1 always fills all of it,
+>   about 30 s of voice at 12 kbps), the untrained test would still give
+>   0.975 at 25 % (about 7.5 s) and 0.836 at 10 % (about 3 s); across all
+>   three planes, 1.000 and 0.874.
+>
+> No CNN was measured. The literature's 70-78 % at the top of this
+> section is for trained CNNs on academic corpora; it is neither an
+> upper bound nor a forecast for Stecho. On v1 carriers an untrained
+> test already scores higher.
 
 ### 4.2 Side channels on the user's device
 
 A compromised device defeats Stecho in many ways the wire format
 cannot help with:
 
-- **Keychain dump.** Stecho's password is stored in iOS Keychain with
-  `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`. This is good
-  hygiene but does not survive a Cellebrite-class forensic
-  extraction of an unlocked device. Once the password is dumped,
+- **Keychain dump.** Stecho's saved passwords are stored in one iOS
+  Keychain item with `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`.
+  This is good hygiene but does not survive a Cellebrite-class forensic
+  extraction of an unlocked device. Once a password is dumped,
   every prior message under that password is decrypted retroactively.
-  See §5 below.
+  Each chat has its own password, so one dumped or coerced password
+  opens one chat's messages, not every correspondent's; a dump of the
+  whole item opens every chat whose password is saved. See §5 below.
+
+- **The saved-password list is on-device metadata.** The same Keychain
+  item holds how many passwords are saved, when each was saved, which
+  chats each is bound to (as device-local participant identifiers, with
+  no names or addresses) and any name the user gave a password. A name
+  is optional by design: a popup asks for it when a new password is
+  about to be saved, and anyone who opens Stecho on the unlocked phone
+  can read it. "Save for this chat" off keeps a password off the phone,
+  at the cost of typing it on every reveal. Someone holding the
+  unlocked phone with the Face ID lock off (the default) opens every
+  chat whose password is saved with one drag. Stecho cannot say which
+  chat a password belongs to, and the chat bindings are lost when the
+  app is installed again (measured in Stiger on iOS 27.2 and 26.7.2 with
+  developer installs, not re-measured in Stecho:
+  [`docs/experiment-participant-ids.md`](docs/experiment-participant-ids.md));
+  a reveal then makes one automatic attempt with the password bound to the
+  chat, and the user picks any other saved password from a menu, one attempt
+  per pick (a wrong stealth attempt costs a whole decode).
 
 - **Clipboard / draft persistence.** If the user composes a long
   text message and the OS keyboard caches it, or if a draft is held
@@ -254,9 +318,26 @@ behaviour of `MSConversation.insertAttachment` on current iOS
 versions, not a contractual guarantee from Apple. If Apple changes
 the iMessage attachment pipeline to recompress JPEGs (re-encode at
 different Q, re-quantize, strip metadata), the J-UNIWARD payload is
-destroyed and decoders return `None`. See
-[`docs/experiment-jpeg-imessage-survival.md`](docs/experiment-jpeg-imessage-survival.md)
-for the empirical state.
+destroyed and decoders return `None`.
+
+This has already happened once. Measured 2026-11-02 between an
+iPhone 12 mini (iOS 26.7.2) and an iPhone 15 Pro (iOS 27.2), 39 real
+sends: iMessage re-encodes every photo tagged with a Display P3
+profile before any receiver gets it (at the sender's upload or on
+Apple's servers), at roughly quality 0.75 into the "Apple Wide Color
+Sharing Profile". The April 2026 F4 build, which had worked on
+iOS 26.4.2, failed the same way. Photos with the sharing profile, an
+sRGB profile, or (JPEG) no profile went through byte for byte.
+Stecho's carriers are therefore encoded with
+`kCGImageDestinationOptimizeColorForSharing`, which yields the sharing
+profile for wide-gamut photos and sRGB otherwise; with that carrier 8
+of 8 sends survived (the carriers' profile was recorded for the Sonoma
+sends, which carried the sharing profile, not for the repeats; an sRGB
+JPEG was measured passing only as a pasted file), in both directions, text and voice, on four source
+photos. Which property of the profile Messages checks (its name, its
+bytes, or a wide-gamut flag) was not separated. See
+[`docs/experiment-device-transport.md`](docs/experiment-device-transport.md)
+for the full matrix.
 
 This is the **single biggest non-cryptographic risk to Stecho.**
 There is no mitigation we can build into the wire format if the
@@ -289,13 +370,19 @@ DCT coefficients compress slightly differently after recompression).
 The encoder does **not** size-normalize the output JPEG to a fixed
 byte count. An observer with access to both the source carrier and
 the resulting Stecho-encoded version could potentially extract
-information from the size delta — though in practice this requires
-the source to be available, which is an unusual threat model for
-iMessage.
+information from the size delta.
 
-If the carrier source is private (never sent elsewhere), this leak
-is bounded to "this JPEG is bigger / smaller than typical iPhone
-photos" rather than a content oracle.
+Without the source, size still says something. A cover-free score
+(the file's size against a calibrated re-compression of itself)
+separates carriers from re-encoded photos (2026-11-03, simulator
+carriers, [`docs/experiment-steganalysis.md`](docs/experiment-steganalysis.md) §2 and §7):
+- v1 stealth on wallpaper crops: files grow (median +10 %, max +35 %)
+  because zero coefficients are forced to ±1; AUC 0.767.
+- v1 stealth on 5 real iPhone photos: files shrink slightly (median
+  0.994 of the cover); AUC 0.81 for a score that knows that sign.
+- Open mode on the real photos: files grow 3 %; AUC 0.984.
+This is a "this JPEG is not a plain re-encode" signal, not a content
+oracle.
 
 ### 4.6 The recipient's device
 
@@ -322,6 +409,20 @@ adversary with access to both copies has the source-target pair).
 The mitigation is operational: **don't keep the unmodified source
 photo if you've embedded a sensitive message into it.**
 
+### 4.8 "From Stecho" in Messages
+
+A photo the extension inserts into a conversation
+(`MSConversation.insertAttachment`) shows an item naming the app in
+Messages' long-press menu: "Desde Stecho" on the receiving iPhone 15
+Pro with a Spanish UI, "From Stecho" in the simulator. Anyone holding
+either phone can see which app sent the photo, even after
+recompression destroyed the payload (recorded 2026-11-01,
+[`docs/experiment-device-transport.md`](docs/experiment-device-transport.md),
+Finding 3). The Pro clipboard-send setting copies the carrier to the
+local pasteboard instead of inserting it, so the user pastes it
+themselves; whether a pasted photo shows no app item has not been
+recorded.
+
 ## 5. Adversary Models
 
 For each adversary class, this section restates what Stecho defends
@@ -329,27 +430,33 @@ in concrete terms.
 
 ### 5.1 Casual snoop ("partner / parent / coworker peeking at your phone")
 
-- Stecho photo is unrecognisable as anything other than a normal photo
-  in Photos / Messages.
+- The photo looks like a normal photo in Photos / Messages, but a
+  photo sent from the extension carries a "From Stecho" item in
+  Messages' long-press menu (§4.8).
 - They cannot read open-mode bodies because they don't have Stecho.
 - They cannot read stealth-mode bodies because they don't have the
   password.
-- They cannot tell from the JPEG file size or thumbnail that anything
-  is hidden.
+- Nothing is visible in the thumbnail. File size is not readable by
+  eye, but a computed size score separates carriers (§4.5).
 
-**Verdict: Stecho works as intended against this adversary.**
+**Verdict: content is protected against this adversary; concealment
+holds only if they don't long-press a photo sent from the extension.**
 
 ### 5.2 Casual stego-tool user ("knows F4 / J-UNIWARD decoders exist, runs them on phones they shouldn't")
 
 - Open-mode JPEGs return `(SECO, body)` to any open-mode-aware
   decoder. They learn the content.
-- Stealth-mode JPEGs without the password return `None`. The
-  attacker cannot distinguish from "not a Stecho photo".
-- They cannot tell from a Stecho JPEG alone whether it carries open,
-  stealth, or no payload.
+- Stealth-mode JPEGs without the password return `None`, so a
+  decoder alone cannot distinguish them from "not a Stecho photo".
+- A published steganalysis attack can. The stock F5 calibration
+  attack separates v1 stealth carriers from re-encoded photos
+  at AUC 0.960 on 150 wallpaper and synthetic sources and 1.000 on 5
+  real iPhone photos (2026-11-03, simulator carriers,
+  [`docs/experiment-steganalysis.md`](docs/experiment-steganalysis.md) §3 and §7).
 
-**Verdict: Stecho's stealth mode works as intended against this
-adversary; open mode is exposed by design.**
+**Verdict: stealth mode protects the content against this adversary
+but not the fact that a message is hidden; open mode is exposed by
+design.**
 
 ### 5.3 Cellebrite-class digital forensics (border control, police)
 
@@ -366,6 +473,7 @@ If the device is unlocked AND the operator has time to extract:
 - Open-mode JPEGs: trivially decodable (anyone with Stecho can).
 - Stealth-mode JPEGs: decodable because the password is in Keychain.
 - Past messages: retroactively decryptable (no forward secrecy).
+- Which photos came from Stecho: visible in Messages (§4.8).
 
 **Verdict: Stecho does not survive Cellebrite-class extraction of an
 unlocked device.** The biometric lock and Keychain accessibility
@@ -375,11 +483,13 @@ do not survive a sophisticated operator with time.
 
 ### 5.4 State-level signal intelligence with stegoanalysis CNN
 
-- Stecho photos in transit may be flagged by a J-UNIWARD-trained
-  CNN classifier with 70-78% accuracy at `α = 0.08`. This is
-  per-image; with N photos, an adversary needing a high-confidence
-  flag can aggregate to lower false positive rates at the cost of
-  hit rate.
+- Stecho photos in transit can be flagged. Measured on v1 stealth
+  carriers (2026-11-03, simulator, [`docs/experiment-steganalysis.md`](docs/experiment-steganalysis.md)): an untrained calibration
+  test at AUC 0.980 (150 wallpaper and synthetic sources) and 1.000 (5
+  real iPhone photos); a trained DCTR feature ensemble at 0.972 and
+  0.937. A CNN has not been measured. This is per-image; with N photos,
+  an adversary needing a high-confidence flag can aggregate to lower
+  false positive rates at the cost of hit rate.
 - Once flagged, content remains AES-GCM-protected. The classifier
   alone yields no plaintext.
 - However, "this JPEG is statistically anomalous" can be a basis
@@ -420,8 +530,10 @@ like VPN configuration data inside ordinary photos.
 
 For this specific use case:
 
-- The carrier looks like a normal photo. Border control / customs /
-  workplace search will not identify it as a tool of interest.
+- The carrier looks like a normal photo, but a reviewer who
+  long-presses it in Messages sees "From Stecho" if it was sent from
+  the extension (§4.8), and anyone who runs a steganalysis test on it
+  can flag it (§4.1).
 - The body is AES-GCM-encrypted. Even if a casual reviewer suspects
   steganography and runs a decoder, they cannot read it without the
   password.
@@ -433,16 +545,18 @@ For this specific use case:
   ECDH exchange, which is fine when the two parties can briefly
   meet but does not survive a remote-only setup.
 
-**Stecho works for this use case** against the realistic adversary
-(automated content scanning of iMessage by the regime, manual review
-of suspected photos at customs). It does NOT survive a targeted
-attack with steganalysis CNN classifier OR with on-device malware.
+**Stecho protects the content in this use case**: a reviewer who
+suspects the photo still cannot read it without the password. It does
+not hide that a message is there from automated scanning that runs a
+steganalysis test, from a reviewer who sees the "From Stecho" item, or
+from on-device malware.
 
 ### 6.2 Journalist sending sensitive voice notes to a source
 
 - Voice content is AES-GCM-protected.
-- Embedding rate is fixed and low (α = 1/12), giving moderate but
-  not zero detectability against a CNN classifier.
+- Embedding rate is fixed (α = 1/12, full stream on every send), and
+  at that rate an untrained statistical test detects v1 carriers at
+  AUC 0.98-1.00 (§4.1).
 - The source device's security is out of scope.
 - iMessage attachment is the transit medium — if the source / target
   is on Android, iMessage downgrades to SMS / MMS which **does not
@@ -471,29 +585,50 @@ These are areas where Stecho does not yet have a defensible answer
 and where the threat model may need to be updated as we measure
 things:
 
-- **CNN detection on real iPhone photos.** Academic numbers are for
-  BOSSbase 512×512 monochrome. We have not formally measured against
-  modern iPhone JPEG output. Real-world accuracy may be substantially
-  lower (carrier out-of-distribution for the classifier) or higher
-  (more textured carriers may give the embedder less hiding room).
+- **CNN detection.** Untrained tests and a DCTR feature ensemble have
+  been measured on v1 carriers, including 5 real iPhone 15 Pro photos
+  (§4.1). A CNN has not: pretrained candidates are being checked for
+  licence and fit. Five photos from one phone are a small sample, and
+  no carrier in these measurements went through iMessage.
 
-- **iOS version sensitivity.** The iMessage transport invariant has
-  been confirmed empirically on iPhone 15 Pro / iOS 26.4.2 (the
-  canonical test device). Behaviour on older OS / older iPhones is
-  not on file. See
-  [`docs/experiment-jpeg-imessage-survival.md`](docs/experiment-jpeg-imessage-survival.md).
+- **iOS version sensitivity.** The transport rule above (§4.3) is
+  measured on iOS 26.7.2 and iOS 27.2 only, two devices, one pair of
+  Apple IDs. Older OS versions, iPad and macOS as a sender are not on
+  file. When Apple started re-encoding Display P3 photos is not
+  known. See
+  [`docs/experiment-device-transport.md`](docs/experiment-device-transport.md).
 
-- **Low Quality Image Mode interaction.** iMessage has a setting to
-  send images at reduced quality. Whether this triggers
-  recompression on JPEG attachments is not measured.
+- **Quantization tables as a marker on the receiver.** An ordinary
+  Display P3 photo arrives re-encoded by Apple (luma DQT row 0
+  `2 2 2 3 5 6 8 10`, ~quality 0.75); a Stecho carrier arrives as sent,
+  with quality-0.85 tables (`1 1 1 2 3 4 6 7`) under the same sharing
+  profile. A reviewer who compares received photos' tables could tell
+  them apart without steganalysis (inferred from the measured tables,
+  not tested against a reviewer). Encoding carriers at 0.75 would close
+  most of the gap (iOS ImageIO at 0.75 still differs from Apple's
+  re-encode in 2 of 64 chroma entries, measured) at a cost in image
+  quality (not measured) and in embedding headroom. The headroom was
+  measured 2026-11-03 on simulator carriers
+  ([`docs/experiment-steganalysis.md`](docs/experiment-steganalysis.md)):
+  - The same stream at 0.75 carries 27-63 % more bits per non-zero AC
+    coefficient on wallpapers and synthetic images, and 19 % more on 5
+    real iPhone 15 Pro photos (0.338 → 0.402).
+  - At v1's full-stream rate that makes the carrier easier to detect,
+    not harder: calibration AUC 0.980 → 0.997, DCTR 0.972 → 0.980. On
+    the real photos calibration is 1.000 at both qualities and DCTR goes
+    0.937 → 0.995.
+
+- **Low-quality photo previews setting.** Messages' "Send Low Quality
+  Photo Previews" was off on both phones in every measured send; its
+  effect when on is not measured.
 
 - **Cellular vs Wi-Fi transit.** Low-bandwidth networks may invoke
-  different attachment paths. Not measured.
+  different attachment paths. Only Wi-Fi was measured (no SIM in the
+  test phone).
 
-- **HEIC vs JPEG attachment dispatch.** Modern iOS captures HEIC by
-  default; Stecho explicitly re-encodes to JPEG before insertion.
-  Whether iMessage might prefer the HEIC sibling representation in
-  any path is not measured.
+- **HEIC vs JPEG attachment dispatch.** Stecho re-encodes every
+  source to JPEG before insertion; a pasted HEIC was itself changed by
+  Messages in transit.
 
 ## 8. Reporting Issues
 

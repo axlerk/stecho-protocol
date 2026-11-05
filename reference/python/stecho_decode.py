@@ -2,7 +2,8 @@
 # Copyright 2026 Pavel Khudiakov
 """
 Reference decoder for the Stecho v1 wire format
-(`juniward-layer.md` + `open-v1.md` + `stealth-v1.md`).
+(`juniward-layer.md` §1-§9 + `open-v1.md` + `stealth-v1.md`), and the
+top-level `decode()` that tries v2 (`stecho_v2.py`) before v1.
 
 This module is the canonical, independent re-implementation of Stecho's
 JPEG steganography. It uses:
@@ -174,7 +175,10 @@ def _stealth_keystream(perm_key: bytes, length_bytes: int) -> bytes:
 
 
 def stealth_permutation(password: bytes, n: int) -> np.ndarray:
-    perm_key = _stealth_perm_key(password)
+    return _stealth_permutation_from_key(_stealth_perm_key(password), n)
+
+
+def _stealth_permutation_from_key(perm_key: bytes, n: int) -> np.ndarray:
     ks = _stealth_keystream(perm_key, n * 4)
     indices = np.arange(n, dtype=np.int64)
     for i in range(n - 1, 0, -1):
@@ -562,8 +566,11 @@ def encode_stealth(jpeg_in_path: str, password: str, type_tag: int,
     im.write_dct(jpeg_out_path)
 
 
-def decode_stealth(jpeg_bytes: bytes, password: str) -> Optional[Tuple[int, bytes]]:
-    """Try to recover a stealth-v1 payload. Returns None on any failure."""
+def decode_stealth(jpeg_bytes: bytes, password: str,
+                   perm_key: Optional[bytes] = None) -> Optional[Tuple[int, bytes]]:
+    """Try to recover a stealth-v1 payload. Returns None on any failure.
+    `perm_key` (PBKDF2 of the password with the fixed perm salt) may be passed
+    in to share one derivation with a stealth-v2 attempt."""
     try:
         im, _path = _read_jpeg_dct(jpeg_bytes)
     except Exception:
@@ -581,7 +588,10 @@ def decode_stealth(jpeg_bytes: bytes, password: str) -> Optional[Tuple[int, byte
         if capacity_bytes < STEALTH_HEADER_LEN + AES_TAG_LEN + STEALTH_INNER_HDR_LEN:
             return None
 
-        perm = stealth_permutation(pw_bytes, n_total)
+        if perm_key is None:
+            perm = stealth_permutation(pw_bytes, n_total)
+        else:
+            perm = _stealth_permutation_from_key(perm_key, n_total)
         n_use = w * 8 * capacity_bytes
         stego_lsbs = np.zeros(n_use, dtype=np.uint8)
         for i in range(n_use):
@@ -619,18 +629,37 @@ def decode_stealth(jpeg_bytes: bytes, password: str) -> Optional[Tuple[int, byte
 # Top-level dispatch
 # ---------------------------------------------------------------------------
 
-def decode(jpeg_bytes: bytes, password: Optional[str] = None) -> Optional[Tuple[str, int, bytes]]:
-    """Try open first, fall through to stealth if password is given.
-    Returns (mode, type_tag, body) or None."""
+def decode_detailed(jpeg_bytes: bytes, password: Optional[str] = None) -> Optional[dict]:
+    """Top-level dispatch (stealth-v2.md §8): open-v2, open-v1, then, with a
+    password, stealth-v2 and stealth-v1. Returns a dict with mode, layer
+    ("v1" / "v2"), rung (v2 only), type_tag and body, or None."""
+    import stecho_v2   # local import: stecho_v2 imports this module
+
+    res = stecho_v2.decode_open_v2(jpeg_bytes)
+    if res is not None:
+        return dict(mode="open", layer="v2", rung=res[0], type_tag=res[1], body=res[2])
     res = decode_open(jpeg_bytes)
     if res is not None:
-        return ("open",) + res
+        return dict(mode="open", layer="v1", rung=None, type_tag=res[0], body=res[1])
     if password is None:
         return None
-    res = decode_stealth(jpeg_bytes, password)
+    # One PBKDF2 run for the permutation key serves both stealth versions.
+    perm_key = _stealth_perm_key(password.encode("utf-8"))
+    res = stecho_v2.decode_stealth_v2(jpeg_bytes, password, perm_key=perm_key)
     if res is not None:
-        return ("stealth",) + res
+        return dict(mode="stealth", layer="v2", rung=res[0], type_tag=res[1], body=res[2])
+    res = decode_stealth(jpeg_bytes, password, perm_key=perm_key)
+    if res is not None:
+        return dict(mode="stealth", layer="v1", rung=None, type_tag=res[0], body=res[1])
     return None
+
+
+def decode(jpeg_bytes: bytes, password: Optional[str] = None) -> Optional[Tuple[str, int, bytes]]:
+    """Returns (mode, type_tag, body) or None; see `decode_detailed`."""
+    res = decode_detailed(jpeg_bytes, password)
+    if res is None:
+        return None
+    return res["mode"], res["type_tag"], res["body"]
 
 
 # ---------------------------------------------------------------------------
@@ -645,12 +674,14 @@ if __name__ == "__main__":
     with open(sys.argv[1], "rb") as f:
         data = f.read()
     pw = sys.argv[2] if len(sys.argv) == 3 else None
-    result = decode(data, pw)
+    result = decode_detailed(data, pw)
     if result is None:
         print("No Stecho payload.", file=sys.stderr)
         sys.exit(1)
-    mode, type_tag, body = result
-    print(f"mode={mode} type=0x{type_tag:02x} body_len={len(body)}", file=sys.stderr)
+    mode, type_tag, body = result["mode"], result["type_tag"], result["body"]
+    rung = f" rung={result['rung']}" if result["rung"] is not None else ""
+    print(f"mode={mode} layer={result['layer']}{rung} type=0x{type_tag:02x} "
+          f"body_len={len(body)}", file=sys.stderr)
     if type_tag == TYPE_TEXT:
         sys.stdout.write(body.decode("utf-8", errors="replace"))
     else:

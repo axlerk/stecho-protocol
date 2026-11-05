@@ -1,7 +1,7 @@
 {
   "generator": "spec/reference/python/generate_test_vectors.py",
-  "spec_version": "juniward-layer + open-v1 + stealth-v1",
-  "notes": "Initial vectors emitted by the Python reference encoder. The shipping Swift engine will re-emit equivalent vectors from its own test suite once available. The Python decoder must read vectors from either source.",
+  "spec_version": "juniward-layer (v1 + v2) + open-v1 + stealth-v1 + open-v2 + stealth-v2",
+  "notes": "Vectors emitted by the Python reference encoder. Each entry names its layer: v1 entries are the frozen v1 batch, v2 entries the v2 batch. The Python decoder must read vectors from any conforming encoder.",
   "vectors": [
     {
       "name": "open-text-hello-ascii",
@@ -11,7 +11,8 @@
       "password": null,
       "type": "text",
       "body_base64": "aGVsbG8gd29ybGQ=",
-      "notes": "Smallest open-mode vector: tiny ASCII payload."
+      "notes": "Smallest open-mode vector: tiny ASCII payload.",
+      "layer": "v1"
     },
     {
       "name": "open-empty",
@@ -21,7 +22,8 @@
       "password": null,
       "type": "text",
       "body_base64": "",
-      "notes": "Zero-length open-mode payload — header only, all padding."
+      "notes": "Zero-length open-mode payload — header only, all padding.",
+      "layer": "v1"
     },
     {
       "name": "stealth-text-hello-ascii",
@@ -31,7 +33,8 @@
       "password": "correct horse battery staple",
       "type": "text",
       "body_base64": "aGVsbG8gd29ybGQ=",
-      "notes": "Smallest stealth-mode vector."
+      "notes": "Smallest stealth-mode vector.",
+      "layer": "v1"
     },
     {
       "name": "stealth-text-unicode",
@@ -41,7 +44,8 @@
       "password": "пар0ль",
       "type": "text",
       "body_base64": "0J/RgNC40LLQtdGCLCBTdGVjaG8hIPCfkYs=",
-      "notes": "UTF-8 body with Cyrillic + emoji and a non-ASCII password."
+      "notes": "UTF-8 body with Cyrillic + emoji and a non-ASCII password.",
+      "layer": "v1"
     },
     {
       "name": "stealth-audio-binary",
@@ -51,7 +55,200 @@
       "password": "voice-test",
       "type": "audio",
       "body_base64": "UP4PgK4LIvG+6UJ/7AGCmIB+CVCaw7uWLIFYdUlMybbw4+Lw1uHrPpFFvIzyK0yhFjkJze8hKEM+1mAilZ0WZb9UI8WjqPmnGhXJGJ1LstuxrUd8W1qlNCxxag1H3dn76qF2HN9zdy/eGxoef/Xtq6KLNot9BJv9LzBC7kCJzNRpjsuxAsc/wPn0yTFcDovWcTMw+BUmLOonKnlxJMTqD/7rtvketWaleEZMn+XAwVMWBBo6Hi545fmXS+cuapkRq3251gcljYc=",
-      "notes": "200 bytes of pseudo-random bytes labeled as audio — stands in for real Opus."
+      "notes": "200 bytes of pseudo-random bytes labeled as audio — stands in for real Opus.",
+      "layer": "v1"
+    },
+    {
+      "name": "v2-open-text-hello",
+      "layer": "v2",
+      "jpeg": "v2-open-text-hello.jpg",
+      "carrier_size": "256x256 synthetic, PIL q85",
+      "mode": "open",
+      "password": null,
+      "type": "text",
+      "rung": 1,
+      "cover_n": 33596,
+      "stream_bytes": 104,
+      "cost": "J-UNIWARD",
+      "changes": 155,
+      "body_base64": "aGVsbG8gd29ybGQ=",
+      "notes": "Smallest open-v2 vector, rung 1."
+    },
+    {
+      "name": "v2-open-empty",
+      "layer": "v2",
+      "jpeg": "v2-open-empty.jpg",
+      "carrier_size": "256x256 synthetic, PIL q85",
+      "mode": "open",
+      "password": null,
+      "type": "text",
+      "rung": 1,
+      "cover_n": 33392,
+      "stream_bytes": 104,
+      "cost": "J-UNIWARD",
+      "changes": 153,
+      "body_base64": "",
+      "notes": "Zero-length open-v2 body: header and padding only."
+    },
+    {
+      "name": "v2-open-text-rung3",
+      "layer": "v2",
+      "jpeg": "v2-open-text-rung3.jpg",
+      "carrier_size": "256x256 synthetic, PIL q85",
+      "mode": "open",
+      "password": null,
+      "type": "text",
+      "rung": 3,
+      "cover_n": 33602,
+      "stream_bytes": 420,
+      "cost": "J-UNIWARD",
+      "changes": 770,
+      "body_base64": "U3RlY2hvIHYyIHRlc3QgdGV4dC4gSXQgaXMgbG9uZyBlbm91Z2ggdG8gbmVlZCBhIGhpZ2hlciBydW5nIHRoYW4gYSBvbmUtbGluZSBub3RlLCBhbmQgaXQgaXMgcGxhaW4gQVNDSUkuIFN0ZWNobyB2MiB0ZXN0IHRleHQuIEl0IGlzIGxvbmcgZW5vdWdoIHRvIG5lZWQgYSBoaWdoZXIgcnVuZyB0aGFuIGEgb25lLWxpbmUgbm90ZSwgYW5kIGl0IGlzIHBsYWluIEFTQ0lJLiBTdGVjaG8gdjIgdGVzdCB0ZXh0LiBJdCBpcyBsb25nIGVub3VnaCB0byBuZWVkIGEgaGlnaGVyIHJ1bmcgdGhhbiBhIG9uZS1saW5lIG5vdGUsIGFuZCBpdCBpcyBwbGFpbiBBU0NJSS4g",
+      "notes": "ASCII text that needs rung 3."
+    },
+    {
+      "name": "v2-open-audio-rung5",
+      "layer": "v2",
+      "jpeg": "v2-open-audio-rung5.jpg",
+      "carrier_size": "256x256 synthetic, PIL q85",
+      "mode": "open",
+      "password": null,
+      "type": "audio",
+      "rung": 5,
+      "cover_n": 33467,
+      "stream_bytes": 1673,
+      "cost": "J-UNIWARD",
+      "changes": 4280,
+      "body_base64": "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",
+      "notes": "1500 pseudo-random bytes labelled audio at the top rung (0.4)."
+    },
+    {
+      "name": "v2-open-text-si-rung4",
+      "layer": "v2",
+      "jpeg": "v2-open-text-si-rung4.jpg",
+      "carrier_size": "256x256 synthetic, reference quantiser, UIImage q0.85 tables",
+      "mode": "open",
+      "password": null,
+      "type": "text",
+      "rung": 4,
+      "cover_n": 61801,
+      "stream_bytes": 1545,
+      "cost": "SI-UNIWARD",
+      "changes": 4304,
+      "body_base64": "0K3RgtC+INC/0YDQvtCy0LXRgNC+0YfQvdGL0Lkg0YLQtdC60YHRgiDQtNC70Y8gU3RlY2hvIHYyOiDQvtC9INC00LvQuNC90L3QtdC1INC60L7RgNC+0YLQutC+0Lkg0LfQsNC/0LjRgdC60LgsINGH0YLQvtCx0Ysg0LfQsNC90Y/RgtGMINGB0LvQtdC00YPRjtGJ0YPRjiDRgdGC0YPQv9C10L3RjC4g0K3RgtC+INC/0YDQvtCy0LXRgNC+0YfQvdGL0Lkg0YLQtdC60YHRgiDQtNC70Y8gU3RlY2hvIHYyOiDQvtC9INC00LvQuNC90L3QtdC1INC60L7RgNC+0YLQutC+0Lkg0LfQsNC/0LjRgdC60LgsINGH0YLQvtCx0Ysg0LfQsNC90Y/RgtGMINGB0LvQtdC00YPRjtGJ0YPRjiDRgdGC0YPQv9C10L3RjC4g0K3RgtC+INC/0YDQvtCy0LXRgNC+0YfQvdGL0Lkg0YLQtdC60YHRgiDQtNC70Y8gU3RlY2hvIHYyOiDQvtC9INC00LvQuNC90L3QtdC1INC60L7RgNC+0YLQutC+0Lkg0LfQsNC/0LjRgdC60LgsINGH0YLQvtCx0Ysg0LfQsNC90Y/RgtGMINGB0LvQtdC00YPRjtGJ0YPRjiDRgdGC0YPQv9C10L3RjC4g0K3RgtC+INC/0YDQvtCy0LXRgNC+0YfQvdGL0Lkg0YLQtdC60YHRgiDQtNC70Y8gU3RlY2hvIHYyOiDQvtC9INC00LvQuNC90L3QtdC1INC60L7RgNC+0YLQutC+0Lkg0LfQsNC/0LjRgdC60LgsINGH0YLQvtCx0Ysg0LfQsNC90Y/RgtGMINGB0LvQtdC00YPRjtGJ0YPRjiDRgdGC0YPQv9C10L3RjC4g0K3RgtC+INC/0YDQvtCy0LXRgNC+0YfQvdGL0Lkg0YLQtdC60YHRgiDQtNC70Y8gU3RlY2hvIHYyOiDQvtC9INC00LvQuNC90L3QtdC1INC60L7RgNC+0YLQutC+0Lkg0LfQsNC/0LjRgdC60LgsINGH0YLQvtCx0Ysg0LfQsNC90Y/RgtGMINGB0LvQtdC00YPRjtGJ0YPRjiDRgdGC0YPQv9C10L3RjC4g0K3RgtC+INC/0YDQvtCy0LXRgNC+0YfQvdGL0Lkg0YLQtdC60YHRgiDQtNC70Y8gU3RlY2hvIHYyOiDQvtC9INC00LvQuNC90L3QtdC1INC60L7RgNC+0YLQutC+0Lkg0LfQsNC/0LjRgdC60LgsINGH0YLQvtCx0Ysg0LfQsNC90Y/RgtGMINGB0LvQtdC00YPRjtGJ0YPRjiDRgdGC0YPQv9C10L3RjC4g",
+      "notes": "UTF-8 text, rung 4, carrier quantised by the reference at q0.85 with SI-UNIWARD costs: the decoder is the same as for J-UNIWARD carriers."
+    },
+    {
+      "name": "v2-open-gray-rung2",
+      "layer": "v2",
+      "jpeg": "v2-open-gray-rung2.jpg",
+      "carrier_size": "256x256 synthetic grayscale, PIL q85",
+      "mode": "open",
+      "password": null,
+      "type": "text",
+      "rung": 2,
+      "cover_n": 37280,
+      "stream_bytes": 233,
+      "cost": "J-UNIWARD",
+      "changes": 380,
+      "body_base64": "U3RlY2hvIHYyIHRlc3QgdGV4dC4gSXQgaXMgbG9uZyBlbm91Z2ggdG8gbmVlZCBhIGhpZ2hlciBydW5nIHRoYW4gYSBvbmUtbGluZSBub3RlLCBhbmQgaXQgaXMgcGxhaW4gQVNDSUkuIEdyYXlzY2FsZSBjYXJyaWVyLg==",
+      "notes": "One-component (grayscale) carrier."
+    },
+    {
+      "name": "v2-open-odd-size",
+      "layer": "v2",
+      "jpeg": "v2-open-odd-size.jpg",
+      "carrier_size": "250x170 synthetic, PIL q85",
+      "mode": "open",
+      "password": null,
+      "type": "text",
+      "rung": 1,
+      "cover_n": 22244,
+      "stream_bytes": 69,
+      "cost": "J-UNIWARD",
+      "changes": 97,
+      "body_base64": "MjUweDE3MDogcGFydGlhbCBNQ1VzLCBjaHJvbWEgMTZ4MTEgYmxvY2tz",
+      "notes": "Carrier whose size is not a multiple of the 16 px MCU: the cover counts each component's own blocks (ceil(size / 8)), not MCU padding."
+    },
+    {
+      "name": "v2-stealth-text-hello",
+      "layer": "v2",
+      "jpeg": "v2-stealth-text-hello.jpg",
+      "carrier_size": "256x256 synthetic, PIL q85",
+      "mode": "stealth",
+      "password": "correct horse battery staple",
+      "type": "text",
+      "rung": 1,
+      "cover_n": 33385,
+      "stream_bytes": 104,
+      "cost": "J-UNIWARD",
+      "changes": 155,
+      "body_base64": "aGVsbG8gd29ybGQ=",
+      "notes": "Smallest stealth-v2 vector, rung 1."
+    },
+    {
+      "name": "v2-stealth-text-unicode-rung2",
+      "layer": "v2",
+      "jpeg": "v2-stealth-text-unicode-rung2.jpg",
+      "carrier_size": "256x256 synthetic, PIL q85",
+      "mode": "stealth",
+      "password": "пар0ль",
+      "type": "text",
+      "rung": 2,
+      "cover_n": 33598,
+      "stream_bytes": 209,
+      "cost": "J-UNIWARD",
+      "changes": 324,
+      "body_base64": "0J/RgNC40LLQtdGCLCBTdGVjaG8gdjIhIPCfkYsg0J/RgNC40LLQtdGCLCBTdGVjaG8gdjIhIPCfkYsg0J/RgNC40LLQtdGCLCBTdGVjaG8gdjIhIPCfkYsg0J/RgNC40LLQtdGCLCBTdGVjaG8gdjIhIPCfkYsg",
+      "notes": "UTF-8 body with Cyrillic and emoji, non-ASCII password, rung 2."
+    },
+    {
+      "name": "v2-stealth-text-forced-rung3",
+      "layer": "v2",
+      "jpeg": "v2-stealth-text-forced-rung3.jpg",
+      "carrier_size": "256x256 synthetic, PIL q85",
+      "mode": "stealth",
+      "password": "rung-three",
+      "type": "text",
+      "rung": 3,
+      "cover_n": 33359,
+      "stream_bytes": 416,
+      "cost": "J-UNIWARD",
+      "changes": 781,
+      "body_base64": "c2hvcnQgdGV4dCwgaGlnaGVyIHJ1bmc=",
+      "notes": "Short text placed at rung 3 although rung 1 fits (a preset may do this): the decoder must not assume the smallest rung."
+    },
+    {
+      "name": "v2-stealth-audio-rung4",
+      "layer": "v2",
+      "jpeg": "v2-stealth-audio-rung4.jpg",
+      "carrier_size": "256x256 synthetic, PIL q85",
+      "mode": "stealth",
+      "password": "voice-test",
+      "type": "audio",
+      "rung": 4,
+      "cover_n": 33480,
+      "stream_bytes": 837,
+      "cost": "J-UNIWARD",
+      "changes": 1812,
+      "body_base64": "yAL3YZx/jFRvIE7AV7O5Z7eZ3siJBCKT/42WIEdqo4ESrTZoGztwkAWzbJQPB9eRDgxrktoZxt88bp1Vg04gFmY7ArD92xK+mnbLdMuWA9KMlaNIUh9QthP9sKh04vBojtzAyCdrZfHvTgFEWEjsB45rs55KeY3NziYdGtTbH5pCLnC3qz+HCnMFWaC7IBhVjUADIN551mDBa4CNfU4RLfqOlU02fYGk7EsYD1UXcnAS8BXZUvw+t6jb9OEsgBZf6P7p+7vI3g0ELIxn4hs4t4UyqdZQ26i7Pu/quRdxBxX2lSdnoYsod8v9ucEXYoh0GquSqfBPNern1GeHyIcFmQEuaoEVirROkw6nR10lceEwLnRf1QjbUowCO2iCevO5m201tb23STAYlSEL8v8RN76NQwrP004lxPAmedPOIdI735O8eM0TMeP9/LSPns9D7FgZciPq3TPEEcPK30uIzcXPbMJIrYGAv1fPzhsEVjUvi/zi9ULX54hu8/pRcbHQ5GrdhBWMhE/IcwpJMREsVfrBn17pzjQaFT6zov1UmRjUiEzDK0ret0WPA8SL08rTCrjPxtbZ+a/nylxD9U9XQPAlth+rpIHZ9HHk/sOURT5tzRtJlwOGQY/k2OsXH36phKczbPxuET84vbJsixcdymCr9mSlfzhTT0VFM2AandmE9dmQ/yZv2o2G/J1M6AuXK7j9TG9/XeCFdckhj3XDpBJHl8VcK7RXdKgdZzIyV0jHobHLxR7dx0MkQtv2KEckKxVBBUElBrskousjPyFHjEMVdCgTJlwJ",
+      "notes": "600 pseudo-random bytes labelled audio, rung 4 (0.2, the Balanced ceiling)."
+    },
+    {
+      "name": "v2-stealth-audio-si-rung5",
+      "layer": "v2",
+      "jpeg": "v2-stealth-audio-si-rung5.jpg",
+      "carrier_size": "256x256 synthetic, reference quantiser, UIImage q0.85 tables",
+      "mode": "stealth",
+      "password": "voice-test",
+      "type": "audio",
+      "rung": 5,
+      "cover_n": 62034,
+      "stream_bytes": 3101,
+      "cost": "SI-UNIWARD",
+      "changes": 8992,
+      "body_base64": "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",
+      "notes": "2000 pseudo-random bytes labelled audio at rung 5, SI-UNIWARD carrier."
     }
   ]
 }

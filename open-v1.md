@@ -19,6 +19,16 @@ how open mode parameterises that layer.
 > **Notation.** All multi-byte integer fields are little-endian unless
 > stated otherwise. `||` is byte-string concatenation.
 
+> **Errata 2026-11-04** (wire format unchanged). This spec used to say
+> `α = 0.08` bits per non-zero AC coefficient and `floor(α × N / 8)`
+> stream bytes. The format as implemented by the reference decoder and the
+> Swift engine, and as the committed v1 vectors encode it, is the layer's
+> fixed `w = 12`: `1/12` bit per AC *slot*, zeros included, and a stream of
+> `S = floor(floor(N / 12) / 8)` bytes for the `N` AC slots of layer v1 §2.
+> The formulas below are corrected; `0.08` survives only as the rough
+> figure it was. Layer v2 replaces this mode for new carriers:
+> [`open-v2.md`](open-v2.md).
+
 ## 1. Inputs
 
 - `jpeg` — baseline or progressive JPEG carrier.
@@ -38,9 +48,9 @@ design.
 
 ## 3. Embedding rate
 
-Open mode uses **`α = 0.08`** bits per non-zero AC coefficient, fixed
-at the v1 protocol level. The encoder MUST NOT vary `α`; the decoder
-MUST assume `α = 0.08`.
+Open mode uses the layer's fixed rate **`1/12` bit per AC slot** (zeros
+included; errata above), often rounded to `α ≈ 0.08`. The encoder MUST NOT
+vary it; the decoder MUST assume it.
 
 `α = 0.08` is chosen to cover the product target of 40 / 60 / 90 s
 voice messages on common iPhone carriers — see capacity table in §5.
@@ -67,18 +77,18 @@ offset    size       field
 ```
 
 Total header: 10 bytes. The padding ensures the embedded stream length
-equals `floor(α × N / 8)` regardless of `body` size, so an external
+equals `S = floor(floor(N / 12) / 8)` regardless of `body` size, so an external
 observer cannot distinguish a short open-mode payload from a long one
 by looking at modification statistics.
 
-`length` MUST satisfy `0 ≤ length ≤ floor(α × N / 8) - 10`. Anything
+`length` MUST satisfy `0 ≤ length ≤ S - 10`. Anything
 outside the range is treated as a malformed open-mode JPEG and triggers
 fallback to stealth-mode decode attempt (§7 below).
 
 ## 5. Capacity
 
 ```
-open_capacity_bytes = floor(0.08 × N / 8) - 10
+open_capacity_bytes = floor(floor(N / 12) / 8) - 10
 ```
 
 where `N` is the position count from layer spec §2. For typical iPhone
@@ -102,7 +112,7 @@ fn encode_open(jpeg, type_tag, body) -> jpeg_out:
     if len(body) > open_capacity_bytes:
         throw insufficient_capacity
     stream = b"SECO" || [0x01] || [type_tag] || u32_le(len(body)) || body
-    stream_size = floor(0.08 × N / 8)
+    stream_size = floor(floor(N / 12) / 8)
     stream || csprng(stream_size - len(stream))    # pad with random
 
     # 2. Convert to bit stream.
@@ -113,7 +123,7 @@ fn encode_open(jpeg, type_tag, body) -> jpeg_out:
         jpeg     = jpeg,
         pi       = identity_permutation(N),
         message  = bits,
-        alpha    = 0.08,
+        w        = 12,
     )
 ```
 
@@ -124,15 +134,15 @@ fn decode_open(jpeg) -> Option<(type_tag, body)>:
     spectral = parse_jpeg(jpeg)
     if spectral == None: return None
     N = position_count(spectral)
-    stream_size_bits = floor(0.08 × N)
-    stream_size_bytes = stream_size_bits // 8
+    stream_size_bytes = floor(floor(N / 12) / 8)
+    stream_size_bits = 8 × stream_size_bytes
 
     # STC-decode the entire open-mode stream.
     bits = juniward_layer.decode(
         jpeg    = jpeg,
         pi      = identity_permutation(N),
         message_length = stream_size_bits,
-        alpha   = 0.08,
+        w       = 12,
     )
     stream = bits_to_bytes(bits, stream_size_bytes)
 

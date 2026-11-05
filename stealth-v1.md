@@ -19,6 +19,16 @@ see [`THREAT_MODEL.md`](THREAT_MODEL.md).
 > **Notation.** All multi-byte integer fields are little-endian unless
 > stated otherwise. `||` is byte-string concatenation.
 
+> **Errata 2026-11-04** (wire format unchanged). This spec used to say
+> `α = 0.08` bits per non-zero AC coefficient and `floor(α × N / 8)`
+> stream bytes. The format as implemented by the reference decoder and the
+> Swift engine, and as the committed v1 vectors encode it, is the layer's
+> fixed `w = 12`: `1/12` bit per AC *slot*, zeros included, and a stream of
+> `S = floor(floor(N / 12) / 8)` bytes for the `N` AC slots of layer v1 §2.
+> The formulas below are corrected; `0.08` survives only as the rough
+> figure it was. Layer v2 replaces this mode for new carriers:
+> [`stealth-v2.md`](stealth-v2.md).
+
 ## 1. Inputs
 
 - `jpeg` — baseline or progressive JPEG carrier.
@@ -75,13 +85,13 @@ Logical step `s` of the permuted walk visits
 
 ## 3. Embedding rate
 
-Stealth mode uses **`α = 0.08` bits per non-zero AC coefficient**, fixed
-at the v1 protocol level, identical to open mode (`open-v1.md` §3).
+Stealth mode uses the layer's fixed rate **`1/12` bit per AC slot**
+(zeros included; errata above), identical to open mode (`open-v1.md` §3).
 This means a stealth-mode JPEG and an open-mode JPEG have the same
 statistical embedding profile — they differ only in what's in the
 permuted bit stream, not in how much of it there is.
 
-The encoder MUST NOT vary `α`. The decoder MUST assume `α = 0.08`.
+The encoder MUST NOT vary the rate. The decoder MUST assume `1/12`.
 
 ## 4. Plaintext stream layout
 
@@ -103,7 +113,7 @@ Decoder authentication via GCM tag is the only positive signal that a
 JPEG contains a stealth-mode payload at all.
 
 ```
-stream_size_bytes = floor(0.08 × N / 8)
+stream_size_bytes = floor(floor(N / 12) / 8)
 ciphertext_with_tag_size = stream_size_bytes - 28
 plaintext_size = ciphertext_with_tag_size - 16   # subtract GCM tag
 ```
@@ -192,8 +202,8 @@ from "not a Stecho JPEG" in user-facing errors.
 ## 6. Capacity
 
 ```
-stealth_payload_max_bytes = floor(0.08 × N / 8) - 28 - 16 - 5
-                          = floor(0.08 × N / 8) - 49
+stealth_payload_max_bytes = floor(floor(N / 12) / 8) - 28 - 16 - 5
+                          = floor(floor(N / 12) / 8) - 49
 ```
 
 Subtracting the 28-byte salt+nonce header, the 16-byte GCM tag, and the
@@ -220,8 +230,8 @@ fn decode_stealth(jpeg, password) -> Option<(type_tag, body)>:
     spectral = parse_jpeg(jpeg)
     if spectral == None: return None
     N = position_count(spectral)
-    stream_size_bits = floor(0.08 × N)
-    stream_size_bytes = stream_size_bits // 8
+    stream_size_bytes = floor(floor(N / 12) / 8)
+    stream_size_bits = 8 × stream_size_bytes
     if stream_size_bytes < 28 + 16 + 5: return None      # carrier too small
 
     # Derive permutation key (slow — PBKDF2-600k).
@@ -232,7 +242,7 @@ fn decode_stealth(jpeg, password) -> Option<(type_tag, body)>:
         jpeg    = jpeg,
         pi      = pi,
         message_length = stream_size_bits,
-        alpha   = 0.08,
+        w       = 12,
     )
     stream = bits_to_bytes(bits, stream_size_bytes)
 
@@ -259,13 +269,21 @@ fn decode_stealth(jpeg, password) -> Option<(type_tag, body)>:
     return Some((type_tag, body))
 ```
 
-The decoder pays roughly `2 × PBKDF2-600k + 1 × STC-decode + 1 × GCM-open`
-per stealth attempt. On Apple Silicon this is sub-second total; on
-A9-class iPhones (iOS 15 floor) approximately 1-2 seconds. Per
+The decoder pays roughly `2 × PBKDF2-600k + 1 × permutation (n/8
+HMAC-SHA256 blocks + Fisher-Yates over n positions) + 1 × STC-decode +
+1 × GCM-open` per stealth attempt. Informative, measured 2026-10-31
+with the Swift implementation on full-capacity carriers: iPhone 15 Pro
+0.23–0.25 s at 1024×768, 0.43–0.46 s at 2048×1536, 0.85–0.93 s at
+3024×2268; iPhone 12 mini 0.28–0.31 s, 0.61–0.81 s and 1.16–1.34 s.
+The permutation table is `4n` bytes (40 MB at 3024×2268). Older devices
+are not measured. Per
 Stecho's UX rules, the compose surface shows a "decrypting…" indicator
 while a stealth attempt is in flight.
 
 ## 8. Composition with open-v1 (informative)
+
+> For decoders that also read v2, the full order is in
+> [`stealth-v2.md`](stealth-v2.md) §8.
 
 The top-level decoder (running in the iMessage extension or container
 app) MUST first attempt `open-v1` decode (free, no password input, no

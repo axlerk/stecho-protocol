@@ -1,8 +1,9 @@
 # Stecho Reference Decoder — Python
 
-Independent re-implementation of Stecho v1 (`juniward-layer.md` +
-`open-v1.md` + `stealth-v1.md`). ~600 LOC of Python, no Stecho Swift
-source code touched at runtime.
+Independent re-implementation of the Stecho wire formats: layer v2
+(`juniward-layer.md` §V2 + `open-v2.md` + `stealth-v2.md`) and the frozen
+layer v1 (`juniward-layer.md` §1–§9 + `open-v1.md` + `stealth-v1.md`).
+No Stecho Swift source code touched at runtime.
 
 For the normative spec see [`../..`](../..).
 
@@ -22,11 +23,13 @@ is not part of the normative spec.
 
 | File | Purpose |
 |------|---------|
-| [`stc.py`](stc.py) | Self-contained STC encoder + decoder. Pinned to the canonical `h=10, w=12` Filler-Judas-Fridrich sub-matrix. |
-| [`stecho_decode.py`](stecho_decode.py) | Position enumeration, J-UNIWARD cost map via `conseal`, PBKDF2 / HMAC permutation, AES-256-GCM, open / stealth mode framing, top-level `decode()`. |
-| [`generate_test_vectors.py`](generate_test_vectors.py) | One-shot script that emits the initial test-vector batch via the Python encoder. |
-| [`verify_test_vectors.py`](verify_test_vectors.py) | Runs the decoder against `../../test-vectors/manifest.json`. |
-| [`requirements.txt`](requirements.txt) | `jpeglib`, `conseal`, `cryptography`, `Pillow`, `numpy`. |
+| [`stc.py`](stc.py) | Self-contained STC encoder + decoder: v1's fixed `h=10, w=12` sub-matrix, and v2's variable block widths (`block_widths`, `stc_encode_v2`, `stc_decode_v2`). |
+| [`stecho_v2.py`](stecho_v2.py) | Layer v2: non-zero cover, keyed permutation (open and stealth), rate ladder and its sub-matrices, per-plane J-UNIWARD and SI-UNIWARD costs, open-v2 / stealth-v2 encoder and decoder, a q0.85 pixel quantiser for SI. |
+| [`stecho_decode.py`](stecho_decode.py) | Layer v1: position enumeration, J-UNIWARD cost map via `conseal`, PBKDF2 / HMAC permutation, AES-256-GCM, open / stealth mode framing. Top-level `decode()` / `decode_detailed()` for every version (open-v2, open-v1, stealth-v2, stealth-v1). |
+| [`stc_submatrix_search.py`](stc_submatrix_search.py) | Seeded search that produced the v2 sub-matrices; [`stc_submatrix_search-result.json`](stc_submatrix_search-result.json) is its recorded output (`juniward-layer.md` §V2.6.3). |
+| [`generate_test_vectors.py`](generate_test_vectors.py) | Emits the test vectors of one layer (`--layer v2`, the default, or `--layer v1`) and merges them into the manifest. |
+| [`verify_test_vectors.py`](verify_test_vectors.py) | Runs the decoder against `../../test-vectors/manifest.json`: mode, layer, rung, type and body, plus wrong-password checks for stealth vectors. |
+| [`requirements.txt`](requirements.txt) | `jpeglib`, `conseal`, `cryptography`, `Pillow`, `numpy`, `scipy`. Decoding needs only `jpeglib`, `numpy`, `cryptography`; `conseal` and `scipy` are for the encoder's costs. |
 
 ## Install
 
@@ -45,11 +48,12 @@ authors against the Binghamton MATLAB reference).
 Decode a Stecho JPEG:
 
 ```bash
-python stecho_decode.py path/to/photo.jpg                  # open mode only
-python stecho_decode.py path/to/photo.jpg "your password"  # tries open, then stealth
+python stecho_decode.py path/to/photo.jpg                  # open mode only (v2, then v1)
+python stecho_decode.py path/to/photo.jpg "your password"  # then stealth (v2, then v1)
 ```
 
-Prints the decoded payload to stdout. Exits non-zero if no payload can
+Prints the decoded payload to stdout and the mode, layer and (v2) rung to
+stderr. Exits non-zero if no payload can
 be recovered (which deliberately conflates "wrong password", "not a
 Stecho photo", and "corrupted Stecho photo" — see spec).
 
@@ -67,18 +71,38 @@ cross-implementation verifier.
 ## Regenerate vectors from Python (informational)
 
 ```bash
-python generate_test_vectors.py ../../test-vectors
+python generate_test_vectors.py ../../test-vectors              # layer v2
+python generate_test_vectors.py ../../test-vectors --layer v1   # layer v1
 ```
 
-Salts and nonces are random per run, so the binary `.jpg` files differ
+Each run rewrites only the layer it is asked for. Salts, nonces, padding
+and the J-UNIWARD change directions are random per run, so the binary `.jpg` files differ
 between runs. The manifest captures only what is decoder-deterministic
 (password + expected `(mode, type, body)`); the JPEG content does not
 need to match byte-for-byte across runs.
 
+## Re-run the v2 sub-matrix search (informational)
+
+```bash
+python stc_submatrix_search.py --n 20480 --out result.json
+python stc_submatrix_search.py --n 20480 --validate
+```
+
+Seeded (numpy `default_rng`, seed 20261104, one generator per rung), so a
+re-run with numpy 2.5.4 prints the table of `juniward-layer.md` §V2.6.3;
+the recorded run is `stc_submatrix_search-result.json`. Checked
+2026-11-04 for rungs 4 and 5 (`--rungs 4,5`): same columns and the same
+scores to four decimals. Rungs 1–3 were not re-run. A few minutes of one
+core.
+
 ## Performance
 
-The reference is built for clarity and correctness, not throughput. On
-an Apple Silicon Mac, indicative numbers:
+v2, 256×256 carriers (about 33 000 non-zero AC coefficients): an encode
+takes about 0.5 s (STC search over 2^10 states per cover element, about
+10 µs per element in numpy), a stealth decode about 0.5 s, mostly
+PBKDF2 (measured 2026-11-04 on an M1 Pro under shared load, so rough).
+
+v1, on an Apple Silicon Mac, indicative numbers:
 
 | Carrier   | Encode (open) | Encode (stealth) | Decode (stealth)  |
 |-----------|---------------|-------------------|-------------------|
@@ -102,8 +126,12 @@ verification on small-to-medium carriers, not bulk processing.
   decoder. PBKDF2 timing follows the `cryptography` library defaults;
   if you need constant-time guarantees for a hostile deployment, port
   to a vetted runtime.
-- The encoder side bridges between J-UNIWARD's per-direction cost (±1)
+- v1 encoder only: the encoder side bridges between J-UNIWARD's per-direction cost (±1)
   and STC's symmetric LSB-flip model by taking `min(rho_+1, rho_-1)`
   per coefficient. The "which direction to actually move" decision at
   apply time uses the F-family convention (decrement |c|), which is
-  consistent with `JUNIWARD_ORIGINAL` symmetric mode.
+  consistent with `JUNIWARD_ORIGINAL` symmetric mode. The v2 encoder
+  instead computes the symmetric cost per plane and chooses the direction
+  per `juniward-layer.md` §V2.9.4.
+- v2's STC encoder keeps one bit per step and trellis state
+  (`n × 128` bytes): fine for test carriers, not for 12 MP photos.

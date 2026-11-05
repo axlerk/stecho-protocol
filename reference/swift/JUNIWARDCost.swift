@@ -81,6 +81,24 @@ public enum JUNIWARDCost {
         }
     }
 
+    // MARK: - Spatial input
+
+    /// Read-only pixel grid for `streamCosts`: `value(x, y)` for
+    /// `0 <= x < width`, `0 <= y < height`. Values are converted to `Double`
+    /// exactly (the engine feeds 8-bit samples), so the source can stay in
+    /// its compact native type instead of a `[[Double]]` copy.
+    public struct Spatial {
+        public let width: Int
+        public let height: Int
+        public let value: (_ x: Int, _ y: Int) -> Double
+
+        public init(width: Int, height: Int, value: @escaping (_ x: Int, _ y: Int) -> Double) {
+            self.width = width
+            self.height = height
+            self.value = value
+        }
+    }
+
     // MARK: - Public entry
 
     /// Compute the J-UNIWARD cost map for a single channel.
@@ -105,94 +123,232 @@ public enum JUNIWARDCost {
         }
         let height = spatial.count
         let width = firstRow.count
+        for row in spatial where row.count != width {
+            throw CostError.shapeMismatch(detail: "spatial rows have inconsistent width")
+        }
+        guard height > 0, width > 0, height % 8 == 0, width % 8 == 0 else {
+            throw CostError.nonMultipleOfEight(width: width, height: height)
+        }
+        var costs = CostMap(blocksY: height / 8, blocksX: width / 8)
+        let blocksX = width / 8
+        try costs.storage.withUnsafeMutableBufferPointer { out in
+            let base = out.baseAddress!
+            try streamCosts(
+                spatial: Spatial(width: width, height: height) { x, y in spatial[y][x] },
+                quantTable: quantTable, implementation: implementation
+            ) { by, bx, block in
+                (base + (by * blocksX + bx) * 64).update(from: block, count: 64)
+            }
+        }
+        return costs
+    }
+
+    /// Bounded-memory form of `compute`: walks the image in strips of
+    /// `stripBlockRows` block rows and hands each block's 64 costs
+    /// (natural order, `r * 8 + c`) to `sink`. Peak memory is two strip
+    /// buffers (≈ `(8·stripBlockRows + 30) × (width + 30) × 32 B`), not
+    /// full-image `[[Double]]` copies.
+    ///
+    /// Every cost is the same sequence of floating-point operations as the
+    /// reference loops above it in history (`correlate2DSame` +
+    /// `cropReferenceCover` + the per-block window sum): each output keeps
+    /// its own accumulator and summation order, and SIMD lanes only ever
+    /// hold *different* outputs, so the result is bit-identical (checked
+    /// by `JUNIWARDCostTests` against the conseal fixture and against the
+    /// legacy implementation kept in the tests).
+    ///
+    /// `sink` is called concurrently from several threads, each time for a
+    /// different block. `progress` (fraction of strips done) and the
+    /// cancellation check run between strips on the calling thread.
+    public static func streamCosts(
+        spatial: Spatial,
+        quantTable: [[Double]],
+        implementation: Implementation = .juniwardOriginal,
+        stripBlockRows: Int = 8,
+        progress: ((Double) -> Void)? = nil,
+        sink: (_ by: Int, _ bx: Int, _ costs: UnsafePointer<Double>) -> Void
+    ) throws {
+        let height = spatial.height
+        let width = spatial.width
         guard height > 0, width > 0, height % 8 == 0, width % 8 == 0 else {
             throw CostError.nonMultipleOfEight(width: width, height: height)
         }
         guard quantTable.count == 8, quantTable.allSatisfy({ $0.count == 8 }) else {
             throw CostError.shapeMismatch(detail: "quantTable must be 8x8")
         }
-        for row in spatial where row.count != width {
-            throw CostError.shapeMismatch(detail: "spatial rows have inconsistent width")
-        }
-
         let blocksY = height / 8
         let blocksX = width / 8
-
-        // 1. Daubechies-8 filters: (hpdf, lpdf) and 3 2D filter kernels.
-        let filters2D = Daubechies8.filters2D    // [3][16][16]
         let filterSize = 16
+        let windowSize = 8 + filterSize - 1        // 23
+        let windowArea = windowSize * windowSize   // 529
 
-        // 2. Spatial impact: for each DCT (r, c), compute the 8×8 pixel
-        //    patch that flipping that DCT coefficient by ±1 produces,
-        //    scaled by the quantization step.
-        let spatialImpact = computeSpatialImpact(quantTable: quantTable)  // [8][8][8][8]
-
-        // 3. Wavelet impact: |correlate2d(spatial_impact, filters[k],
-        //    mode=full, fill=0)| for each filter and each (r, c).
-        //    Shape: [3][8][8][23][23] where 23 = 8 + 16 - 1.
-        let waveletImpact = computeWaveletImpact(
-            spatialImpact: spatialImpact, filters: filters2D
-        )
-
-        // 4. Symmetric-pad the cover spatial image by `filterSize` pixels
-        //    on each side, then correlate with each filter (mode='same').
-        //    The resulting reference_covers are cropped to the
-        //    JUNIWARD_ORIGINAL crop window.
-        let padded = symmetricPad(spatial, padSize: filterSize)
-        var referenceCovers: [[[Double]]] = []   // [3][rcHeight][rcWidth]
-        referenceCovers.reserveCapacity(3)
+        // Wavelet impact |correlate2d_full(spatial_impact, filter_k)|,
+        // transposed to [k][window position][64 coefficients] so one
+        // window sample multiplies 64 independent accumulators.
+        let spatialImpact = computeSpatialImpact(quantTable: quantTable)
+        let waveletImpact = computeWaveletImpact(spatialImpact: spatialImpact, filters: Daubechies8.filters2D)
+        let wiT = UnsafeMutablePointer<SIMD4<Double>>.allocate(capacity: 3 * windowArea * 16)
+        defer { wiT.deallocate() }
         for k in 0..<3 {
-            let full = correlate2DSame(padded, kernel: filters2D[k])
-            // Crop per JUNIWARD_ORIGINAL: rc[pad-7 : height+8+pad, pad-7 : width+8+pad].
-            let cropped = cropReferenceCover(
-                full,
-                padSize: filterSize,
-                height: height, width: width
-            )
-            referenceCovers.append(cropped)
-        }
-
-        // 5. For each 8×8 block, slide a 23×23 window over each
-        //    reference cover, weight by reciprocal of (|window| + σ),
-        //    and accumulate over the wavelet_impact tensor.
-        var costs = CostMap(blocksY: blocksY, blocksX: blocksX)
-        let windowSize = 8 + filterSize - 1   // = 23
-        for by in 0..<blocksY {
-            for bx in 0..<blocksX {
-                // The 23×23 window starts at offset (by*8, bx*8) in the
-                // cropped reference cover (stride=8 over the cover).
-                for k in 0..<3 {
-                    let rc = referenceCovers[k]
-                    var reciprocal = [[Double]](
-                        repeating: [Double](repeating: 0, count: windowSize),
-                        count: windowSize
-                    )
-                    for wy in 0..<windowSize {
-                        let rowAbs = rc[by * 8 + wy]
-                        for wx in 0..<windowSize {
-                            reciprocal[wy][wx] = 1.0 / (abs(rowAbs[bx * 8 + wx]) + sigma)
+            for wy in 0..<windowSize {
+                for wx in 0..<windowSize {
+                    let base = (k * windowArea + wy * windowSize + wx) * 16
+                    for t in 0..<16 {
+                        var v = SIMD4<Double>()
+                        for l in 0..<4 {
+                            let rc = t * 4 + l
+                            v[l] = waveletImpact[k][rc / 8][rc % 8][wy][wx]
                         }
-                    }
-                    // Accumulate per DCT-coefficient cost contribution.
-                    let wiK = waveletImpact[k]
-                    for r in 0..<8 {
-                        for c in 0..<8 {
-                            let wi = wiK[r][c]
-                            var acc: Double = 0
-                            for wy in 0..<windowSize {
-                                let wiRow = wi[wy]
-                                let recRow = reciprocal[wy]
-                                for wx in 0..<windowSize {
-                                    acc += wiRow[wx] * recRow[wx]
-                                }
-                            }
-                            costs[by, bx, r, c] += acc
-                        }
+                        wiT[base + t] = v
                     }
                 }
             }
         }
-        return costs
+        var filters = [Double](repeating: 0, count: 3 * 256)
+        for k in 0..<3 {
+            for ky in 0..<16 {
+                for kx in 0..<16 {
+                    filters[k * 256 + ky * 16 + kx] = Daubechies8.filters2D[k][ky][kx]
+                }
+            }
+        }
+
+        // Geometry (see `cropReferenceCover`): the cropped reference cover
+        // rc_k has (height + 15) × (width + 15) samples and
+        //   rc_k[y][x] = Σ_{ky,kx} padded[y + 2 + ky][x + 2 + kx] · f_k[ky][kx]
+        // where padded = symmetricPad(spatial, 16). Those indices stay
+        // inside the padded image, so correlate2DSame's zero fill never
+        // applies.
+        let rows = max(1, stripBlockRows)
+        let pw = width + 30
+        let rcW = width + 15
+        let maxPadRows = rows * 8 + 30
+        let maxRcRows = rows * 8 + 15
+        let pad = UnsafeMutablePointer<Double>.allocate(capacity: maxPadRows * pw)
+        defer { pad.deallocate() }
+        // Reciprocal weights 1 / (|rc_k| + σ) for the three sub-bands.
+        let rec = UnsafeMutablePointer<Double>.allocate(capacity: 3 * maxRcRows * rcW)
+        defer { rec.deallocate() }
+        let mirrorX = (0..<pw).map { mirrorIndex($0 + 2 - filterSize, length: width) }
+        let workers = max(1, ProcessInfo.processInfo.activeProcessorCount)
+
+        try filters.withUnsafeBufferPointer { fBuf in
+            let f = fBuf.baseAddress!
+            var by0 = 0
+            while by0 < blocksY {
+                if Task.isCancelled { throw CancellationError() }
+                progress?(Double(by0) / Double(blocksY))
+                let by1 = min(blocksY, by0 + rows)
+                let padRows = (by1 - by0) * 8 + 30
+                let rcRows = (by1 - by0) * 8 + 15
+                let rcPlane = rcRows * rcW
+
+                // 1. Padded source rows for this strip.
+                DispatchQueue.concurrentPerform(iterations: padRows) { yy in
+                    let srcY = mirrorIndex(by0 * 8 + 2 + yy - filterSize, length: height)
+                    let row = pad + yy * pw
+                    for xx in 0..<pw {
+                        row[xx] = spatial.value(mirrorX[xx], srcY)
+                    }
+                }
+
+                // 2. Reference covers → reciprocal weights, one row per task.
+                DispatchQueue.concurrentPerform(iterations: rcRows) { y in
+                    let out0 = rec + y * rcW
+                    let out1 = out0 + rcPlane
+                    let out2 = out1 + rcPlane
+                    var x = 0
+                    while x + 4 <= rcW {
+                        var a0 = SIMD4<Double>(), a1 = SIMD4<Double>(), a2 = SIMD4<Double>()
+                        for ky in 0..<16 {
+                            let src = UnsafeRawPointer(pad + (y + ky) * pw + x)
+                            let fr = f + ky * 16
+                            for kx in 0..<16 {
+                                let v = src.loadUnaligned(fromByteOffset: kx * 8, as: SIMD4<Double>.self)
+                                a0 += v * SIMD4(repeating: fr[kx])
+                                a1 += v * SIMD4(repeating: fr[256 + kx])
+                                a2 += v * SIMD4(repeating: fr[512 + kx])
+                            }
+                        }
+                        for l in 0..<4 {
+                            out0[x + l] = 1.0 / (abs(a0[l]) + sigma)
+                            out1[x + l] = 1.0 / (abs(a1[l]) + sigma)
+                            out2[x + l] = 1.0 / (abs(a2[l]) + sigma)
+                        }
+                        x += 4
+                    }
+                    while x < rcW {
+                        var a0 = 0.0, a1 = 0.0, a2 = 0.0
+                        for ky in 0..<16 {
+                            let src = pad + (y + ky) * pw + x
+                            let fr = f + ky * 16
+                            for kx in 0..<16 {
+                                let v = src[kx]
+                                a0 += v * fr[kx]
+                                a1 += v * fr[256 + kx]
+                                a2 += v * fr[512 + kx]
+                            }
+                        }
+                        out0[x] = 1.0 / (abs(a0) + sigma)
+                        out1[x] = 1.0 / (abs(a1) + sigma)
+                        out2[x] = 1.0 / (abs(a2) + sigma)
+                        x += 1
+                    }
+                }
+
+                // 3. Per-block window sums. Tasks split the strip's blocks
+                //    into contiguous runs.
+                let blockCount = (by1 - by0) * blocksX
+                let tasks = min(blockCount, workers * 4)
+                DispatchQueue.concurrentPerform(iterations: tasks) { task in
+                    let lo = task * blockCount / tasks
+                    let hi = (task + 1) * blockCount / tasks
+                    withUnsafeTemporaryAllocation(of: Double.self, capacity: 64) { costBuf in
+                        let cost = costBuf.baseAddress!
+                        for idx in lo..<hi {
+                            let by = by0 + idx / blocksX
+                            let bx = idx % blocksX
+                            cost.initialize(repeating: 0, count: 64)
+                            for k in 0..<3 {
+                                let recK = rec + k * rcPlane + (by - by0) * 8 * rcW + bx * 8
+                                for half in 0..<2 {
+                                    var a0 = SIMD4<Double>(), a1 = SIMD4<Double>()
+                                    var a2 = SIMD4<Double>(), a3 = SIMD4<Double>()
+                                    var a4 = SIMD4<Double>(), a5 = SIMD4<Double>()
+                                    var a6 = SIMD4<Double>(), a7 = SIMD4<Double>()
+                                    for wy in 0..<windowSize {
+                                        let recRow = recK + wy * rcW
+                                        var wp = wiT + (k * windowArea + wy * windowSize) * 16 + half * 8
+                                        for wx in 0..<windowSize {
+                                            let r = SIMD4(repeating: recRow[wx])
+                                            a0 += wp[0] * r
+                                            a1 += wp[1] * r
+                                            a2 += wp[2] * r
+                                            a3 += wp[3] * r
+                                            a4 += wp[4] * r
+                                            a5 += wp[5] * r
+                                            a6 += wp[6] * r
+                                            a7 += wp[7] * r
+                                            wp += 16
+                                        }
+                                    }
+                                    let out = UnsafeMutableRawPointer(cost + half * 32)
+                                        .assumingMemoryBound(to: Double.self)
+                                    func add(_ v: SIMD4<Double>, _ t: Int) {
+                                        for l in 0..<4 { out[t * 4 + l] += v[l] }
+                                    }
+                                    add(a0, 0); add(a1, 1); add(a2, 2); add(a3, 3)
+                                    add(a4, 4); add(a5, 5); add(a6, 6); add(a7, 7)
+                                }
+                            }
+                            sink(by, bx, cost)
+                        }
+                    }
+                }
+                by0 = by1
+            }
+        }
+        progress?(1)
     }
 
     // MARK: - Step 2: spatial impact
