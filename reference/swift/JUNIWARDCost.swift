@@ -160,12 +160,35 @@ public enum JUNIWARDCost {
     /// `sink` is called concurrently from several threads, each time for a
     /// different block. `progress` (fraction of strips done) and the
     /// cancellation check run between strips on the calling thread.
+    ///
+    /// `needed`, when given, says which costs of a block the caller will
+    /// read: bit `t` of its result stands for the four coefficients at
+    /// natural positions `4t ..< 4t + 4` (row `t / 2`, columns 0-3 or 4-7).
+    /// Only those are guaranteed: the other entries passed to `sink` are 0
+    /// or happen to be computed, and must not be read, and a block that
+    /// needs none is not passed to `sink` at all. A cost
+    /// that is computed is the same sequence of operations as without the
+    /// mask, so it is the same bits (`JUNIWARDCostStripTests`). Layer v2
+    /// embeds only in non-zero AC coefficients, and at q0.85 most of a
+    /// block's 64 are zero, so most of the window sums are never read.
+    /// A half block (eight groups of four coefficients) with at most this
+    /// many groups needed is summed group by group; above it the eight-wide
+    /// pass is cheaper, because it loads each window sample once for all
+    /// eight. Measured on macOS (2026-11-05, three 3024 px q0.85 JPEGs, luma
+    /// plane, the whole cost pass): 1.3-1.4x faster than unmasked at a limit
+    /// of 2, 1.4-1.6x at 4; higher limits were not separated from the noise
+    /// of a loaded machine. On the iPhone 12 mini (iOS 26.7.2, all three
+    /// planes of two 3024 px carriers, median of 5, limit 4,
+    /// `ReviewSpeedupBenchTests`): 3.24 s -> 2.08 s and 3.73 s -> 2.46 s.
+    static let sparseGroupLimit = 4
+
     public static func streamCosts(
         spatial: Spatial,
         quantTable: [[Double]],
         implementation: Implementation = .juniwardOriginal,
         stripBlockRows: Int = 8,
         progress: ((Double) -> Void)? = nil,
+        needed: ((_ by: Int, _ bx: Int) -> UInt16)? = nil,
         sink: (_ by: Int, _ bx: Int, _ costs: UnsafePointer<Double>) -> Void
     ) throws {
         let height = spatial.height
@@ -308,10 +331,34 @@ public enum JUNIWARDCost {
                         for idx in lo..<hi {
                             let by = by0 + idx / blocksX
                             let bx = idx % blocksX
+                            let mask = needed?(by, bx) ?? 0xFFFF
+                            if mask == 0 { continue }
                             cost.initialize(repeating: 0, count: 64)
                             for k in 0..<3 {
                                 let recK = rec + k * rcPlane + (by - by0) * 8 * rcW + bx * 8
                                 for half in 0..<2 {
+                                    let halfMask = (mask >> UInt16(8 * half)) & 0xFF
+                                    if halfMask == 0 { continue }
+                                    if halfMask.nonzeroBitCount <= sparseGroupLimit {
+                                        // Few groups: one pass over the window
+                                        // per group, each with its own
+                                        // accumulator in the same (wy, wx)
+                                        // order as the eight-wide pass below.
+                                        let out = cost + half * 32
+                                        for g in 0..<8 where halfMask & (1 << UInt16(g)) != 0 {
+                                            var a = SIMD4<Double>()
+                                            for wy in 0..<windowSize {
+                                                let recRow = recK + wy * rcW
+                                                var wp = wiT + (k * windowArea + wy * windowSize) * 16 + half * 8 + g
+                                                for wx in 0..<windowSize {
+                                                    a += wp.pointee * SIMD4(repeating: recRow[wx])
+                                                    wp += 16
+                                                }
+                                            }
+                                            for l in 0..<4 { out[g * 4 + l] += a[l] }
+                                        }
+                                        continue
+                                    }
                                     var a0 = SIMD4<Double>(), a1 = SIMD4<Double>()
                                     var a2 = SIMD4<Double>(), a3 = SIMD4<Double>()
                                     var a4 = SIMD4<Double>(), a5 = SIMD4<Double>()

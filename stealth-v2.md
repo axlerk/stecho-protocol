@@ -195,6 +195,12 @@ rung to rung, so its key cannot be derived once. Worst cases:
 
 (One less of each for every rung with `L_k < 49`.) The proposal (§3.2)
 assumed PBKDF2 runs once per attempt; with this framing it does not.
+The runs of different rungs are independent, so a decoder MAY derive
+several rungs' keys at once, as long as the lowest rung that opens is the
+result (§V2.5.2). The Swift decoder takes the rungs two at a time: a wrong
+password is three rounds of wall-clock time instead of five runs in a row,
+and a payload at rung `k` costs `1 + min(5, 2 × ceil(k / 2))` runs in
+`ceil(k / 2)` rounds.
 Stecho's reveal makes one automatic stealth attempt and leaves other
 saved passwords to a menu (`AGENTS.md`), so each wrong password costs the
 whole worst case. Not yet timed on a phone. For an attacker the same cost
