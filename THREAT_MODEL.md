@@ -166,7 +166,7 @@ rung lower, in open mode, which anyone with Stecho can read anyway.
 >   0.85), emitted in the simulator. Each is scored against Apple's
 >   encode of the same picture: the ordinary photo a warden would see
 >   instead.
-> - Real photos: 8 of the owner's iPhone 15 Pro photos without people.
+> - Real photos: 8 of the owner's iPhone 15 Pro photos.
 >   Round 3 used 24 crops of them at 2048 px, round 4 the 8 originals as
 >   HEIC at 2048 and 3024 px (the presets' size).
 > - Detectors: a DCTR feature + FLD ensemble (trained 5-fold by photo on
