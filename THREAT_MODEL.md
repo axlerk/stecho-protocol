@@ -25,7 +25,7 @@ is described in [§7](#7-history-layer-v1).
   password (open mode) anyone with Stecho reads it.
 - Stecho does not hide *that* a photo may carry a message: Messages
   labels the photo "From Stecho", and a statistical test can flag it;
-  in our simulation, hardly at the default setting, easily at the
+  in our measurements, hardly at the default setting, easily at the
   largest one.
 - A phone in someone else's hands defeats it: saved passwords, spyware,
   screenshots. A leaked password opens every past message under it.
@@ -39,7 +39,7 @@ is described in [§7](#7-history-layer-v1).
   режим) его прочитает любой, у кого есть Stecho.
 - Stecho не скрывает *сам факт*, что в фото может быть сообщение:
   «Сообщения» подписывают фото «From Stecho», а статистический тест
-  может его заметить: в нашей симуляции с трудом на настройке по
+  может его заметить: в наших замерах с трудом на настройке по
   умолчанию и легко на самой большой.
 - Телефон в чужих руках сводит защиту на нет: сохранённые пароли,
   шпионская программа, скриншоты. Утёкший пароль открывает все прошлые
@@ -143,41 +143,88 @@ stream as Stecho's on purpose. Use stealth mode when the content matters.
 
 A statistical test can tell a photo with a message from one without,
 without recovering the content. How well depends on the rate, the photo
-and the test. **Every figure for layer v2 is simulated**: measured
-2026-11-03 with our own numpy encoder and an ideal embedding simulator in
-place of the codes, on 200 sources (102 wallpaper crops, 48 synthetic
-images, 50 crops of 5 iPhone 15 Pro photos), not on carriers from the
-app ([`docs/experiment-steganalysis-v2-sim.md`](docs/experiment-steganalysis-v2-sim.md)
-§3, §6). On the iPhone photos at quality 0.85 with SI-UNIWARD:
+and the test.
 
-- at 0.1 (Hidden), no detector in the simulation scored above AUC 0.507;
-- at 0.2 (Balanced, the default), none scored above 0.553 at 2048 px or
-  0.583 at 3024 px;
-- at 0.4 (Long messages), the untrained calibration test scored 0.929.
+**What the app writes: layer v2 with the hybrid cover** (from
+2026-11-08). The message is written into the DCT coefficients of
+Apple's own JPEG encode of the picture: the file ImageIO writes for the
+same pixels at quality 0.85 with Apple's sharing colour profile. Without
+a message that file is byte-identical to Apple's encode (checked on 88
+test carriers from 80 sources, and in a unit test), so Stecho's encoder
+adds no statistical mark of its own; the file-level signs in §4.3
+(quality-0.85 tables, minimal EXIF, 16 px sides) still apply. What a
+detector can look for is the embedding itself, and how visible that is
+depends on how much is embedded. The rate is the smallest of five rungs
+that holds the message, capped by the sender's preset: Hidden at rung 3,
+Balanced (the default) at rung 4, Long at rung 5. Free users send one
+rung lower, in open mode, which anyone with Stecho can read anyway.
 
-Smooth images are easier at the same rate: at 0.2 the same test scored
-0.712 on the wallpaper crops and 0.870 on the synthetic images. AUC 0.5
-is a coin toss, 1.0 a perfect split. The detectors were a 2002-class
-histogram calibration test, with no training, and a DCTR feature
-ensemble trained on this small corpus. Four published, pretrained
-steganalysis networks run on the same simulated carriers on 2026-11-04
-did no better: with SI-UNIWARD at 0.1 and 0.2 none scored above 0.565 in
-any class or 0.525 on the iPhone photos; at 0.4 a linear probe on one of
-them reached 0.736 overall and 0.664 on the iPhone photos
-([`docs/experiment-steganalysis-cnn.md`](docs/experiment-steganalysis-cnn.md)).
+> **What we have measured** (2026-11-07/08,
+> [`docs/experiment-steganalysis-v2-si.md`](docs/experiment-steganalysis-v2-si.md),
+> rounds 3 and 4). Conditions:
+> - Carriers from the app's own engine (STCv2, stealth-v2, quality
+>   0.85), emitted in the simulator. Each is scored against Apple's
+>   encode of the same picture: the ordinary photo a warden would see
+>   instead.
+> - Real photos: 8 of the owner's iPhone 15 Pro photos without people.
+>   Round 3 used 24 crops of them at 2048 px, round 4 the 8 originals as
+>   HEIC at 2048 and 3024 px (the presets' size).
+> - Detectors: a DCTR feature + FLD ensemble (trained 5-fold by photo on
+>   72 sources, and the same training scored on the HEIC originals) and
+>   the untrained calibration test `beta_Y` (the F5-attack family).
+>
+> AUC on real photos (0.5 = chance, 1.0 = always caught), lowest to
+> highest across the corpora:
+>
+> | Rung (preset ceiling) | DCTR + FLD | untrained `beta_Y` |
+> |---|---|---|
+> | 1–3 (Hidden; short messages under any preset) | 0.49–0.54 | 0.52–0.67 |
+> | 4 (Balanced) | 0.52–0.54 | 0.50–0.69 |
+> | 5 (Long) | 0.59–0.71 | 0.98–1.00 |
+>
+> For comparison, plain J-UNIWARD written into the same Apple file is
+> caught by the untrained test at rung 3 (0.83–0.84) and at rung 4
+> (0.98–1.00). Photos that are already a JPEG at the carrier size (24
+> made from the same photos) gave DCTR 0.51–0.53 through rung 4 and 0.62
+> at rung 5; the untrained test does not work on them, for covers and
+> carriers alike. Smooth images are much easier: at rung 4 the untrained
+> test scored 0.98 on wallpaper crops and 0.84 on synthetic images.
+
+**A Long message can be told from an ordinary photo by a published
+statistical test with no training**, without recovering the content.
+The test is the 2002 F5 calibration attack, a few dozen lines of numpy,
+so anyone who can run a published attack on a photo has it. The app
+says so when a message passes the Balanced line. At the Hidden and
+Balanced ceilings the trained detector stays at chance on these photos
+(at most 0.54), and the untrained test reaches at most 0.69, within the
+noise of 8 pairs. That is not a claim of undetectability:
+
+- The corpus is small. Every real-photo figure comes from the same 8
+  photos, taken by one person on one phone, and every round-4 AUC rests
+  on 8 pairs. A detector trained on many phone photos may do better.
+- Anyone who also holds the original photo can probably rebuild the
+  cover (inferred: Apple's encode of the same pixels was identical on
+  every source measured) and then see every changed coefficient (§4.8).
+- v2 builds from 2026-11-04 to 2026-11-08 wrote Stecho's own JPEG encode
+  instead of Apple's. A trained detector separates that file from
+  Apple's at AUC about 0.76, and the untrained test at about 0.87 on
+  real photos, with or without a message.
 
 Not measured, and therefore not claimed:
 
-- carriers from the app's own encoder, with real codes, under any
-  detector;
-- a network trained on Stecho carriers, which may do much better than
-  the ones above;
-- photos that are already JPEG at or below the carrier size: they are
-  not scaled, so the side information comes from an image quantised
-  once before, and the SI-UNIWARD advantage is expected to shrink there
-  (inferred from how the costs are built, layer §V2.9.3);
-- carriers that went through iMessage (a sharing-profile carrier arrives
-  byte for byte, §1, so the coefficients should be the same ones).
+- a network trained on Stecho carriers. Four published, pretrained
+  steganalysis networks did no better than the detectors above on
+  simulated v2 carriers on 2026-11-04
+  ([`docs/experiment-steganalysis-cnn.md`](docs/experiment-steganalysis-cnn.md)),
+  which says little about one trained for the purpose;
+- byte identity through iMessage for a hybrid carrier. One hybrid voice
+  message went from the iPhone 12 mini to the 15 Pro on 2026-11-08 and
+  the delivered file decoded at the rung it was written with; the sent
+  file was not captured for comparison. A sharing-profile carrier
+  arrives byte for byte (§4.5), so the coefficients should be the same
+  ones;
+- the 2048 px setting from a camera HEIC on a phone, where ImageIO rounds
+  differently; the 3024 px presets were measured as the phones see them.
 
 Open and stealth carriers at the same rate use the same layer, costs and
 rate, so they should be equally detectable (inferred, open-v2 §8). A
@@ -309,7 +356,7 @@ messages nothing.
 | Who | What they can see | What stays protected |
 |---|---|---|
 | **A casual snoop** with your phone in hand (partner, parent, coworker) | A normal-looking photo; "From Stecho" if they long-press it in Messages (§4.4); every chat with a saved password, if the Face ID lock is off (§4.6) | Open and stealth content without the phone; stealth content without the password or a saved one |
-| **Someone with a published steganalysis test** (a few dozen lines of code, no training) | Open-mode content, in full. In the simulation, hardly anything at Hidden or Balanced on iPhone photos, a clear flag at Long messages and on smooth images (§4.1); the message size to within 2× in open mode (§4.2); the file's tables, EXIF and 16 px sides (§4.3) | Stealth content. A flag is a reason to look closer, not a decrypt |
+| **Someone with a published steganalysis test** (a few dozen lines of code, no training) | Open-mode content, in full. In our measurements, hardly anything at Hidden or Balanced on iPhone photos, a clear flag at Long messages and on smooth images (§4.1); the message size to within 2× in open mode (§4.2); the file's tables, EXIF and 16 px sides (§4.3) | Stealth content. A flag is a reason to look closer, not a decrypt |
 | **Forensic extraction of an unlocked phone** (someone with the tools and time: border control, police) | Saved passwords from the Keychain, so every chat with a saved password, past messages included (§4.6, §4.9); the Photos library; which photos came from Stecho (§4.4) | Chats whose password was never saved, as long as the password is strong (§2.1) |
 | **Spyware on the phone** | The decoded text on screen, the voice in the speaker buffer, the password as it is typed | Nothing (§4.6) |
 
@@ -320,9 +367,10 @@ not.
 
 ## 6. Open questions
 
-- **The app's own carriers.** No detector has been run on carriers from
-  the shipping encoder with real codes, and no network has been trained
-  on Stecho carriers. The figures in §4.1 are the simulation's.
+- **A larger corpus and a trained network.** The figures in §4.1 come
+  from the shipping encoder with real codes, but on 8 real photos and
+  with classical detectors. No network has been trained on Stecho
+  carriers, and many more phone photos may move the numbers.
 - **A test written for v2.** The calibration tests were built for v1's
   shrinkage and are applied to v2 with a learned sign; a test of v2's
   `|c| = 1 ↔ 2` balance has not been written.
