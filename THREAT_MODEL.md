@@ -159,19 +159,21 @@ that holds the message, capped by the sender's preset: Hidden at rung 3,
 Balanced (the default) at rung 4, Long at rung 5. Free users send one
 rung lower, in open mode, which anyone with Stecho can read anyway.
 
-> **What we have measured** (2026-11-07/08,
+> **What we have measured** (2026-11-07 to 09,
 > [`docs/experiment-steganalysis-v2-si.md`](docs/experiment-steganalysis-v2-si.md),
-> rounds 3 and 4). Conditions:
+> rounds 3 to 5). Conditions:
 > - Carriers from the app's own engine (STCv2, stealth-v2, quality
 >   0.85), emitted in the simulator. Each is scored against Apple's
 >   encode of the same picture: the ordinary photo a warden would see
 >   instead.
-> - Real photos: 8 of the owner's iPhone 15 Pro photos.
->   Round 3 used 24 crops of them at 2048 px, round 4 the 8 originals as
->   HEIC at 2048 and 3024 px (the presets' size).
+> - Real photos, all the owner's own. Rounds 3 and 4: 8 iPhone 15 Pro
+>   photos, as 24 crops at 2048 px and as the 8 originals at 2048 and
+>   3024 px (the presets' size). Round 5: 59 originals from two phones
+>   (55 iPhone 15 Pro, 4 iPhone 12 mini) at 3024 px.
 > - Detectors: a DCTR feature + FLD ensemble (trained 5-fold by photo on
->   72 sources, and the same training scored on the HEIC originals) and
->   the untrained calibration test `beta_Y` (the F5-attack family).
+>   72 sources and scored on the round-4 originals; in round 5 trained
+>   5-fold by photo on the 59 photos themselves) and the untrained
+>   calibration test `beta_Y` (the F5-attack family).
 >
 > AUC on real photos (0.5 = chance, 1.0 = always caught), lowest to
 > highest across the corpora:
@@ -179,12 +181,17 @@ rung lower, in open mode, which anyone with Stecho can read anyway.
 > | Rung (preset ceiling) | DCTR + FLD | untrained `beta_Y` |
 > |---|---|---|
 > | 1–3 (Hidden; short messages under any preset) | 0.49–0.54 | 0.52–0.67 |
-> | 4 (Balanced) | 0.52–0.54 | 0.50–0.69 |
+> | 4 (Balanced) | 0.52–0.55 | 0.50–0.69 |
 > | 5 (Long) | 0.59–0.71 | 0.98–1.00 |
 >
+>
+> On the largest set, round 5's 59 photos with the detector trained on
+> them: DCTR 0.52 through rung 3, 0.55 at rung 4 and 0.68 at rung 5; the
+> untrained test 0.53–0.57 through rung 4 and 0.98 at rung 5.
+>
 > For comparison, plain J-UNIWARD written into the same Apple file is
-> caught by the untrained test at rung 3 (0.83–0.84) and at rung 4
-> (0.98–1.00). Photos that are already a JPEG at the carrier size (24
+> caught by the untrained test at rung 3 (0.74–0.84) and at rung 4
+> (0.97–1.00). Photos that are already a JPEG at the carrier size (24
 > made from the same photos) gave DCTR 0.51–0.53 through rung 4 and 0.62
 > at rung 5; the untrained test does not work on them, for covers and
 > carriers alike. Smooth images are much easier: at rung 4 the untrained
@@ -196,18 +203,19 @@ The test is the 2002 F5 calibration attack, a few dozen lines of numpy,
 so anyone who can run a published attack on a photo has it. The app
 says so when a message passes the Balanced line. At the Hidden and
 Balanced ceilings the trained detector stays at chance on these photos
-(at most 0.54), and the untrained test reaches at most 0.69, within the
-noise of 8 pairs. That is not a claim of undetectability:
+(at most 0.55), and the untrained test reaches at most 0.69 on the
+8-photo sets and 0.57 on the 59-photo set. That is not a claim of
+undetectability:
 
-- The corpus is small. Every real-photo figure comes from the same 8
-  photos, taken by one person on one phone, and every round-4 AUC rests
-  on 8 pairs. A detector trained on many phone photos may do better.
+- The corpus is still modest: the owner's own photos, 8 in rounds 3 and
+  4 and 59 from two iPhones in round 5, all taken by one person. A
+  detector trained on many people's phone photos may do better.
 - Anyone who also holds the original photo can probably rebuild the
   cover (inferred: Apple's encode of the same pixels was identical on
   every source measured) and then see every changed coefficient (§4.8).
 - v2 builds from 2026-11-04 to 2026-11-08 wrote Stecho's own JPEG encode
   instead of Apple's. A trained detector separates that file from
-  Apple's at AUC about 0.76, and the untrained test at about 0.87 on
+  Apple's at AUC 0.76–0.83, and the untrained test at 0.77–0.87 on
   real photos, with or without a message.
 
 Not measured, and therefore not claimed:
