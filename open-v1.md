@@ -1,5 +1,14 @@
 # Open Mode v1 (`open-v1`)
 
+> **Retired (2026-11-10).** Layer v1 was written by exactly one TestFlight
+> build (build 1) and never reached a release; no App Store version contains
+> it. The owner retired it on 2026-11-10 with no compatibility period: no
+> shipping decoder and no reference decoder reads it, and a v1 carrier reads
+> as "no hidden data", like any JPEG without a payload. The current formats
+> are [`open-v2.md`](open-v2.md) and [`stealth-v2.md`](stealth-v2.md). The
+> text below is kept unchanged as history (v2 documents cite its section
+> numbers and its permutation-key derivation).
+
 The mode used by **free-tier** Stecho. The carrier is a publicly-readable
 Stecho JPEG: anyone with the Stecho app (or a conforming decoder) can
 extract the payload without any password.

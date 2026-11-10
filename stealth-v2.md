@@ -7,8 +7,8 @@ cannot reconstruct the order, read coherent bytes, or verify the GCM tag.
 
 This document defines how stealth mode frames its message on top of
 [`juniward-layer.md`](juniward-layer.md) layer v2 (§V2.1–§V2.13). It
-replaces [`stealth-v1.md`](stealth-v1.md) for new carriers; v1 carriers
-stay readable (§8).
+replaces [`stealth-v1.md`](stealth-v1.md) (retired 2026-11-10, not read by
+any decoder; §8).
 
 Status: draft. The layer's open items apply; two are specific to this
 mode: the PBKDF2 run per rung tried (O3, §9) and the reuse of v1's
@@ -42,11 +42,13 @@ perm_key = PBKDF2-HMAC-SHA256(
               dkLen    = 32)
 ```
 
-This is **the same key as stealth-v1** (§2.1 there). The versions are
+This is **the same key as stealth-v1** (§2.1 there; v1 is retired, but the
+salt label is part of the v2 wire format). The versions are
 separated by the keystream info tag (§2.2) and by the cover itself (v1
-permutes all `N` AC slots, v2 the `n` non-zero ones). Reusing the key means
-one PBKDF2 run gives the permutation for both versions, so a decoder that
-tries both pays for it once (O8: a choice of this draft, to be reviewed).
+permutes all `N` AC slots, v2 the `n` non-zero ones). Reusing the key meant
+one PBKDF2 run gave the permutation for both versions, so a decoder that
+tried both paid for it once (O8: a choice of this draft, to be reviewed;
+the label stays now that v1 is retired).
 
 ### 2.2 Order
 
@@ -155,35 +157,34 @@ fn decode_stealth_v2(jpeg, password, perm_key = None) -> Option<(k, type_tag, bo
 Rungs are tried in ascending order; the first that authenticates wins
 ([`juniward-layer.md`](juniward-layer.md) §V2.5.2).
 
-## 8. Composition with open mode and with v1 (normative order)
+## 8. Composition with open mode (normative order)
 
-A decoder that reads every version tries, in this order:
+A decoder tries, in this order:
 
 ```
 fn decode_any(jpeg, password_opt):
     if open_v2.decode(jpeg) is Some(r):   return ("open", "v2", r)
-    if open_v1.decode(jpeg) is Some(r):   return ("open", "v1", r)
     if password_opt is None:              return None
     perm_key = pbkdf2(password, "stecho-stealth-v1-perm-salt", 600000, 32)
     if stealth_v2.decode(jpeg, password, perm_key) is Some(r): return ("stealth", "v2", r)
-    if stealth_v1.decode(jpeg, password, perm_key) is Some(r): return ("stealth", "v1", r)
     return None
 ```
 
-- Open before stealth, as in v1: open costs no PBKDF2.
-- v2 before v1: new carriers are v2.
-- A decoder MAY leave out the v1 steps (layer O7); it then cannot read v1
-  carriers and changes nothing else.
+- Open before stealth: open costs no PBKDF2.
+- Layer v1 is not tried. It was retired on 2026-11-10 (written by one
+  TestFlight build only, never released); a v1 carrier decodes to `None`
+  like any JPEG without a payload. Until that date this section had two
+  more steps, `open_v1` after `open_v2` and `stealth_v1` after
+  `stealth_v2`, and a decoder MAY leave them out (layer O7).
 - Collisions: a stealth stream that also parses as open would need
-  `SECO || 0x02` (or `0x01`) and a consistent length at the right offset
-  of a stream read in the wrong order, about 2⁻⁴⁰ per rung tried; open wins
-  if it happens, as in v1.
+  `SECO || 0x02` and a consistent length at the right offset of a stream
+  read in the wrong order, about 2⁻⁴⁰ per rung tried; open wins if it
+  happens.
 
 ## 9. Cost per attempt (informative; O3)
 
-Per stealth-v2 attempt: one PBKDF2-600k for `perm_key` (shared with
-stealth-v1), one permutation of `n` elements, then for each usable rung
-tried one STC pass, **one PBKDF2-600k for that rung's `aes_key`**, and one
+Per stealth-v2 attempt: one PBKDF2-600k for `perm_key`, one permutation of
+`n` elements, then for each usable rung tried one STC pass, **one PBKDF2-600k for that rung's `aes_key`**, and one
 GCM open. The AES salt is read from each rung's stream, which differs from
 rung to rung, so its key cannot be derived once. Worst cases:
 
@@ -191,7 +192,6 @@ rung to rung, so its key cannot be derived once. Worst cases:
 |---|---|---|
 | right password, payload at rung `k` | 1 + `k` | `k` |
 | wrong password, or no stealth payload | 1 + 5 | 5 |
-| plus stealth-v1 fallback | + 1 | + 1 (v1) |
 
 (One less of each for every rung with `L_k < 49`.) The proposal (§3.2)
 assumed PBKDF2 runs once per attempt; with this framing it does not.

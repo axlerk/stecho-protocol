@@ -4,13 +4,14 @@
 """Generate Stecho test vectors with the Python reference encoder.
 
 Vectors are committed and immutable: each run draws fresh salts, nonces and
-padding, so the JPEG bytes differ between runs. Regenerate a layer only when
-its wire format changes. Running for one layer rewrites that layer's JPEGs
-and manifest entries and keeps the other layer's entries as they are.
+padding, so the JPEG bytes differ between runs. Regenerate only when the
+wire format changes. A run rewrites the v2 JPEGs and the manifest.
+
+Layer v1 (retired 2026-11-10, no shipping build reads it) has no generator
+any more and no vectors in the manifest.
 
 Usage:
-    python generate_test_vectors.py ../../test-vectors            # v2 only
-    python generate_test_vectors.py ../../test-vectors --layer v1  # v1 only
+    python generate_test_vectors.py ../../test-vectors
 
 Carriers are synthetic (gradients plus seeded noise), never photos.
 """
@@ -24,67 +25,9 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from stecho_decode import (
-    TYPE_AUDIO_OPUS,
-    TYPE_TEXT,
-    encode_open,
-    encode_stealth,
-)
+from stecho_decode import TYPE_AUDIO_OPUS, TYPE_TEXT
 
 TYPE_NAMES = {TYPE_TEXT: "text", TYPE_AUDIO_OPUS: "audio"}
-
-
-# ---------------------------------------------------------------------------
-# v1 (frozen; kept so the v1 batch can be reproduced in kind)
-# ---------------------------------------------------------------------------
-
-def make_carrier(size: int, path: Path, seed: int) -> None:
-    """v1 carrier: diagonal gradient + reproducible noise, 4:2:0, PIL q85."""
-    rng = np.random.default_rng(seed)
-    yy, xx = np.meshgrid(np.arange(size), np.arange(size), indexing="ij")
-    base = ((xx + yy) % 256).astype(np.int16)
-    noise = rng.integers(-30, 31, size=(size, size), dtype=np.int16)
-    arr = np.clip(
-        np.stack([base, base, base], axis=-1) + noise[..., None],
-        0, 255,
-    ).astype(np.uint8)
-    Image.fromarray(arr, "RGB").save(path, quality=85)
-
-
-def v1_vectors(base: Path) -> list:
-    audio_rng = np.random.default_rng(7777)
-    fake_audio = bytes(audio_rng.integers(0, 256, size=200, dtype=np.uint8))
-    plan = [
-        ("open-text-hello-ascii", 1, "open", None, TYPE_TEXT, b"hello world",
-         "Smallest open-mode vector: tiny ASCII payload."),
-        ("open-empty", 2, "open", None, TYPE_TEXT, b"",
-         "Zero-length open-mode payload — header only, all padding."),
-        ("stealth-text-hello-ascii", 3, "stealth", "correct horse battery staple", TYPE_TEXT,
-         b"hello world", "Smallest stealth-mode vector."),
-        ("stealth-text-unicode", 4, "stealth", "пар0ль", TYPE_TEXT,
-         "Привет, Stecho! 👋".encode("utf-8"),
-         "UTF-8 body with Cyrillic + emoji and a non-ASCII password."),
-        ("stealth-audio-binary", 5, "stealth", "voice-test", TYPE_AUDIO_OPUS, fake_audio,
-         "200 bytes of pseudo-random bytes labeled as audio — stands in for real Opus."),
-    ]
-    out = []
-    for name, seed, mode, password, type_tag, body, notes in plan:
-        carrier_path = base / f"_carrier-{name}.jpg"
-        jpeg_path = base / f"{name}.jpg"
-        make_carrier(256, carrier_path, seed)
-        if mode == "open":
-            encode_open(str(carrier_path), type_tag, body, str(jpeg_path))
-        else:
-            encode_stealth(str(carrier_path), password, type_tag, body, str(jpeg_path))
-        carrier_path.unlink()
-        out.append({
-            "name": name, "layer": "v1", "jpeg": jpeg_path.name,
-            "carrier_size": "256x256 synthetic", "mode": mode, "password": password,
-            "type": TYPE_NAMES[type_tag],
-            "body_base64": base64.b64encode(body).decode("ascii"), "notes": notes,
-        })
-        print(f"  emitted {jpeg_path.name} ({jpeg_path.stat().st_size} B)")
-    return out
 
 
 # ---------------------------------------------------------------------------
@@ -202,30 +145,24 @@ def v2_vectors(base: Path) -> list:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("out_dir")
-    ap.add_argument("--layer", choices=("v1", "v2"), default="v2")
     a = ap.parse_args()
     base = Path(a.out_dir).resolve()
     base.mkdir(parents=True, exist_ok=True)
     manifest_path = base / "manifest.json"
-    old = json.loads(manifest_path.read_text()) if manifest_path.exists() else {"vectors": []}
-    kept = [v for v in old["vectors"] if v.get("layer", "v1") != a.layer]
-    for v in kept:
-        v.setdefault("layer", "v1")
-    fresh = v1_vectors(base) if a.layer == "v1" else v2_vectors(base)
-    vectors = sorted(kept + fresh, key=lambda v: v["layer"])
+    vectors = v2_vectors(base)
     manifest = {
         "generator": "spec/reference/python/generate_test_vectors.py",
-        "spec_version": "juniward-layer (v1 + v2) + open-v1 + stealth-v1 + open-v2 + stealth-v2",
+        "spec_version": "juniward-layer (v2) + open-v2 + stealth-v2",
         "notes": (
-            "Vectors emitted by the Python reference encoder. Each entry names its "
-            "layer: v1 entries are the frozen v1 batch, v2 entries the v2 batch. "
+            "Vectors emitted by the Python reference encoder, all layer v2. Layer v1 "
+            "was retired on 2026-11-10 and its vectors were removed. "
             "The Python decoder must read vectors from any conforming encoder."
         ),
         "vectors": vectors,
     }
     manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
                              encoding="utf-8")
-    print(f"  wrote manifest.json ({len(vectors)} vectors, {len(fresh)} new {a.layer})")
+    print(f"  wrote manifest.json ({len(vectors)} vectors)")
     return 0
 
 

@@ -7,8 +7,8 @@ the photo, not protected (§8).
 
 This document defines how open mode frames its message on top of
 [`juniward-layer.md`](juniward-layer.md) layer v2 (§V2.1–§V2.13). It
-replaces [`open-v1.md`](open-v1.md) for new carriers; v1 carriers stay
-readable (§7.2).
+replaces [`open-v1.md`](open-v1.md) (retired 2026-11-10, not read by any
+decoder; §7.2).
 
 Status: draft. The open items of the layer apply, in particular the rate
 ladder (O1) and the sub-matrices (O4) ([`juniward-layer.md`](juniward-layer.md),
@@ -122,13 +122,14 @@ Rungs are tried in ascending order and the first valid one wins
 reports which rung it found (the reference does) exposes nothing new: the
 rung is readable by anyone in open mode.
 
-### 7.2 Together with open-v1
+### 7.2 Retired open-v1
 
-A decoder that also reads v1 carriers tries `open-v2` first, then
-`open-v1` ([`open-v1.md`](open-v1.md) §7). The two never accept the same
-stream: the v1 decoder reads all AC slots in identity order and requires
-version `0x01`, the v2 decoder reads the non-zero cover in the open-v2
-order and requires `0x02`. Full dispatch, with stealth mode:
+`open-v1` ([`open-v1.md`](open-v1.md)) was retired on 2026-11-10 and no
+decoder tries it: a v1 carrier (version `0x01`, all AC slots in identity
+order) reads as no payload. The two never accepted the same stream anyway:
+the v1 decoder read all AC slots in identity order and required version
+`0x01`, the v2 decoder reads the non-zero cover in the open-v2 order and
+requires `0x02`. Full dispatch, with stealth mode:
 [`stealth-v2.md`](stealth-v2.md) §8.
 
 ## 8. Threat model

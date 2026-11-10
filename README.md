@@ -22,28 +22,43 @@ described here, that is a bug.
 
 | Path | What it covers |
 |------|----------------|
-| [`juniward-layer.md`](juniward-layer.md) | Shared by both modes. Maps a message bit stream to AC DCT LSB modifications via J-UNIWARD content-adaptive distortion + Syndrome-Trellis Codes (STC). Holds layer **v2** (§V2.1–§V2.13, current draft, with its open items at the top) and layer **v1** (§1–§9, frozen). |
+| [`juniward-layer.md`](juniward-layer.md) | Shared by both modes. Maps a message bit stream to AC DCT LSB modifications via J-UNIWARD content-adaptive distortion + Syndrome-Trellis Codes (STC). Holds layer **v2** (§V2.1–§V2.13, current draft, with its open items at the top) and, as history, retired layer **v1** (§1–§9). |
 | [`open-v2.md`](open-v2.md)               | Open mode on layer v2 — public, no privacy. Used by the free tier. |
-| [`stealth-v2.md`](stealth-v2.md)         | Stealth mode on layer v2 — password-derived permutation + AES-256-GCM. Used by Pro. Also the decoder dispatch order across modes and versions (§8). |
-| [`open-v1.md`](open-v1.md)               | Open mode on layer v1 (frozen; readable). |
-| [`stealth-v1.md`](stealth-v1.md)         | Stealth mode on layer v1 (frozen; readable). |
-| [`reference/python/`](reference/python/) | Independent Python reference encoder and decoder for v1 and v2. Run it against `test-vectors/` to verify your decoder is bit-compatible. |
-| [`test-vectors/`](test-vectors/)         | Known JPEGs + passwords + expected `(type, body)`, v1 and v2 (each entry names its layer; v2 entries also the rung). Emitted by the Python encoder; the Swift decoder reads both sets (`CrossImplVectorsTests`). `test-vectors/swift-v2/` holds v2 carriers emitted by the Swift encoder, for the Python decoder. |
+| [`stealth-v2.md`](stealth-v2.md)         | Stealth mode on layer v2 — password-derived permutation + AES-256-GCM. Used by Pro. Also the decoder dispatch order across modes (§8). |
+| [`open-v1.md`](open-v1.md), [`stealth-v1.md`](stealth-v1.md) | **Retired** (2026-11-10). The formats of one TestFlight build, kept as history; no shipping or reference decoder reads them (see "Retired: layer v1" below). |
+| [`reference/python/`](reference/python/) | Independent Python reference encoder and decoder for v2. Run it against `test-vectors/` to verify your decoder is bit-compatible. |
+| [`test-vectors/`](test-vectors/)         | Known JPEGs + passwords + expected `(type, body)`, all layer v2 (each entry also names the rung). Emitted by the Python encoder; the Swift decoder reads the set (`CrossImplVectorsTests`). `test-vectors/swift-v2/` holds v2 carriers emitted by the Swift encoder, for the Python decoder. |
 
 ## Stability
 
-Versioned by format. Layer v1 and its modes (`open-v1`, `stealth-v1`)
-are frozen. Layer v2 is the incompatible successor (non-zero cover,
-permutation in both modes, a five-rung rate ladder) and has its own mode
-files (`open-v2`, `stealth-v2`); it is a draft until the open items listed
-at the top of `juniward-layer.md` close, then it is frozen too. Both
-layer versions live in `juniward-layer.md`, v1 under its original
-section numbers.
+Versioned by format. Layer v2 and its modes (`open-v2`, `stealth-v2`) are
+the current formats (non-zero cover, permutation in both modes, a five-rung
+rate ladder); layer v2 is a draft until the open items listed at the top of
+`juniward-layer.md` close, then it is frozen. An incompatible change
+requires a new version number and a new spec file. `juniward-layer.md`
+still holds the retired layer v1 under its original section numbers (§1–§9),
+because the v2 text cites them.
 
-Decoders for v2 MAY attempt v1 as a fallback after v2 fails (order in
-`stealth-v2.md` §8), but a v1 decoder MUST NOT attempt to interpret a v2
-stream. Open streams carry a version byte (`0x01`, `0x02`); stealth
-streams carry none and are told apart by which version authenticates.
+Open streams carry a version byte (`0x02` for open-v2; `0x01` was open-v1);
+stealth streams carry none and are told apart by which stream authenticates.
+The dispatch order of a decoder is `stealth-v2.md` §8.
+
+### Retired: layer v1
+
+Layer v1 (`open-v1`, `stealth-v1`: every AC slot, one fixed rate of `1/12`,
+identity order in open mode) was written by exactly one TestFlight build,
+build 1, and never reached a release: no App Store version contains it. The
+owner retired it on 2026-11-10, without a compatibility period, because no
+installed base was worth carrying it for (the same decision, for the same
+reason, that retired Stiger's previous format on 2026-11-08). The shipping
+Swift decoder and the reference decoders no longer read it, and a v1
+carrier decodes to "no hidden data", exactly as a JPEG without a payload
+does; the test vectors of v1 were removed from `test-vectors/`. The
+documents `open-v1.md`, `stealth-v1.md` and `juniward-layer.md` §1–§9 stay
+as history, unchanged apart from a notice, because v2 reuses parts of them
+(the stealth permutation key and its salt label `stecho-stealth-v1-perm-salt`
+are part of the v2 wire format). Git history holds the old decoders. A photo
+made by TestFlight build 1 does not open in a later build.
 
 The encoder algorithm is **not** part of this spec: an attacker who can
 choose what to embed already has the password, so encoder behaviour is
@@ -75,8 +90,7 @@ A v2 decoder reads the JPEG, lists the non-zero AC coefficients, derives
 the permutation from the mode (the public open-mode key or the
 password-derived stealth key), and for each of the five rungs recovers a
 stream via STC and hands it to the mode, which accepts the first rung whose
-frame is valid. v1 is the same picture with all AC slots, one fixed rate,
-and the identity order in open mode.
+frame is valid.
 
 ## A note on transport
 

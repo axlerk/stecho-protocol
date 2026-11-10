@@ -4,7 +4,7 @@
 Reference encoder and decoder for the Stecho v2 wire format
 (`juniward-layer.md` §V2 + `open-v2.md` + `stealth-v2.md`).
 
-What changes from v1 (stecho_decode.py):
+What differs from the retired layer v1 (no longer implemented or read):
 
 - The cover is the non-zero AC coefficients only, in the canonical v1 order.
   Embedding never creates or removes a zero (|c| = 1 that must change goes
@@ -289,7 +289,7 @@ def decode_open_v2(jpeg_bytes: bytes) -> Optional[Tuple[int, int, bytes]]:
 def decode_stealth_v2(jpeg_bytes: bytes, password: str,
                       perm_key: Optional[bytes] = None) -> Optional[Tuple[int, int, bytes]]:
     """(rung, type_tag, body) of a stealth-v2 payload, or None. `perm_key`
-    may be passed in to share one PBKDF2 run with a stealth-v1 attempt."""
+    may be passed in by a caller that already derived it."""
     try:
         pw = password.encode("utf-8")
         cover = cover_v2(_component_planes(_read_dct(jpeg_bytes)))

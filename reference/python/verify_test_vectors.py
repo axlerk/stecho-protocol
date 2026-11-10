@@ -8,7 +8,7 @@ Usage:
 
 Reads `manifest.json`, runs the top-level `stecho_decode.decode_detailed` on
 each carrier JPEG with the listed password, and compares the produced mode,
-layer (v1 / v2), rung (v2) and (type, body) against the expected values.
+layer (v2), rung and (type, body) against the expected values.
 For every stealth vector it also checks that the carrier yields nothing
 without the password and with a wrong one. A passing run is evidence the
 Python decoder matches the spec end-to-end.
@@ -54,7 +54,7 @@ def main(vectors_dir: str) -> int:
             continue
         expected_type = TYPE_NAMES[expected_type_str]
 
-        expected_layer = v.get("layer", "v1")
+        expected_layer = v.get("layer", "v2")
         expected_rung = v.get("rung")
 
         jpeg_bytes = jpeg_path.read_bytes()

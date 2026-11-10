@@ -11,8 +11,8 @@ too.
 
 The byte-for-byte wire format and an independent reference decoder you
 can run yourself are in [`spec/`](spec/README.md). The app writes
-embedding layer v2 (since 2026-11-04) and still reads v1 carriers; v1
-is described in [§7](#7-history-layer-v1).
+embedding layer v2 (since 2026-11-04) and no longer reads v1 carriers
+(retired 2026-11-10); v1 is described in [§7](#7-history-layer-v1).
 
 ## TL;DR
 
@@ -395,7 +395,10 @@ not.
 The app wrote layer v1 until 2026-11-04
 ([`spec/juniward-layer.md`](spec/juniward-layer.md) §1–§9,
 [`spec/open-v1.md`](spec/open-v1.md),
-[`spec/stealth-v1.md`](spec/stealth-v1.md)); it still reads v1 carriers.
+[`spec/stealth-v1.md`](spec/stealth-v1.md)). Only one TestFlight build
+(build 1) ever wrote it, and no App Store release contains it; on
+2026-11-10 the app stopped reading v1 carriers too (they read as "no hidden
+data"), and the spec marks v1 retired.
 What was different, and what was measured on it:
 
 - **A fixed rate.** v1 embedded 1/12 bit per AC slot, zeros included,

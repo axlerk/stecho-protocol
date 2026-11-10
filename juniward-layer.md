@@ -10,13 +10,14 @@ This document defines two versions of the layer:
 | Layer | Status | Modes on top | Sections |
 |---|---|---|---|
 | **v2** | current; draft until the items under "Open" close | [`open-v2.md`](open-v2.md), [`stealth-v2.md`](stealth-v2.md) | §V2.1–§V2.13 |
-| **v1** | frozen; kept so v1 carriers stay readable | [`open-v1.md`](open-v1.md), [`stealth-v1.md`](stealth-v1.md) | §1–§9 |
+| **v1** | retired 2026-11-10, historical; not read by any shipping or reference decoder | [`open-v1.md`](open-v1.md), [`stealth-v1.md`](stealth-v1.md) | §1–§9 |
 
 v1 keeps its original section numbers because code, tests and other
 documents cite them. The two versions are not compatible: a v1 decoder
-reads garbage from a v2 carrier and the reverse, so a decoder that
-supports both tries each (dispatch order in [`stealth-v2.md`](stealth-v2.md)
-§8). Open-mode streams carry a version byte (`0x01` for v1, `0x02` for
+reads garbage from a v2 carrier and the reverse. v1 was written by one
+TestFlight build only and is not decoded any more (see "Layer v1 (retired)"
+below); the dispatch order of a v2 decoder is in
+[`stealth-v2.md`](stealth-v2.md) §8. Open-mode streams carry a version byte (`0x01` for v1, `0x02` for
 v2); stealth streams have no plaintext marker in either version and are
 told apart by which one authenticates.
 
@@ -49,8 +50,8 @@ O8 change the wire format if they change; the others do not.
 | O4 | **STC sub-matrices** | Own seeded search, h = 10 (§V2.6.3) | The Binghamton table v1 used stops at width 20 and is not available here beyond v1's w = 12 row. At w = 12 the published matrix scored 0.5 % lower distortion than the best of 16 random candidates, so a longer search or a published table could be slightly more efficient. |
 | O5 | **Audio body format** (type `0x02`) | Not defined by these specs (§V2.1) | The body is the app's Opus container (`StechoCore/OpusCodec.swift`, container version 1, 20 ms frames, one `u16` length per frame). Another session is measuring a change of the frame length; that changes the body, not this layer. The container is not yet specified for independent decoders. |
 | O6 | **J-UNIWARD variant** | conseal `JUNIWARD_ORIGINAL`, as the Swift engine (§V2.9) | The v2 simulation measured conseal's default `JUNIWARD_FIX_OFF_BY_ONE`. Encoder-only; the difference in detectability is not measured. |
-| O7 | **v1 in the app** | This spec keeps v1 decodable | The proposal says v2 replaces v1 with no dual decoder (Stecho has no users yet). A decoder MAY drop v1; the reference keeps it. |
-| O8 | **Stealth permutation key** | v2 reuses v1's PBKDF2 salt, new keystream info tag ([`stealth-v2.md`](stealth-v2.md) §2) | A choice of this draft: one PBKDF2 run gives the permutation key for both versions. Needs review. |
+| O7 | **v1 in the app** | Closed 2026-11-10: v1 is retired, no decoder reads it | The proposal said v2 replaces v1 with no dual decoder. v1 had been written by one TestFlight build only; the app and the reference dropped the v1 fallback and its vectors. |
+| O8 | **Stealth permutation key** | v2 reuses v1's PBKDF2 salt, new keystream info tag ([`stealth-v2.md`](stealth-v2.md) §2) | A choice of this draft: one PBKDF2 run gives the permutation key (it was shared with v1's fallback until v1 was retired). Needs review. |
 | O9 | **Detectability figures** | Simulated only (§V2.12) | No STC, no CNN in the simulation; final numbers come from proposal §7 and go into `THREAT_MODEL.md`. |
 
 ---
@@ -514,9 +515,17 @@ transport recompression destroys the payload (`THREAT_MODEL.md` §4.3).
 
 ---
 
-# Layer v1 (frozen)
+# Layer v1 (retired, historical)
 
-The sections below are layer v1 as frozen, with their original numbers.
+> **Retired (2026-11-10).** Layer v1 was written by exactly one TestFlight
+> build (build 1) and never reached a release. No shipping decoder and no
+> reference decoder reads it; a v1 carrier reads as "no hidden data". The
+> sections below are kept unchanged as history because v2 cites their
+> numbers and reuses the permutation-key derivation (§V2.4,
+> [`stealth-v2.md`](stealth-v2.md) §2.1). See [`README.md`](README.md),
+> "Retired: layer v1".
+
+The sections below are layer v1 as it was frozen, with their original numbers.
 **Errata of 2026-11-04** (wire format unchanged; the text now matches the
 reference decoder, the Swift engine and the committed v1 vectors): v1's
 rate is `1/12` bit per AC *slot*, zeros included, not `α = 0.08` per

@@ -1,5 +1,14 @@
 # Stealth Mode v1 (`stealth-v1`)
 
+> **Retired (2026-11-10).** Layer v1 was written by exactly one TestFlight
+> build (build 1) and never reached a release; no App Store version contains
+> it. The owner retired it on 2026-11-10 with no compatibility period: no
+> shipping decoder and no reference decoder reads it, and a v1 carrier reads
+> as "no hidden data", like any JPEG without a payload. The current formats
+> are [`open-v2.md`](open-v2.md) and [`stealth-v2.md`](stealth-v2.md). The
+> text below is kept unchanged as history (v2 documents cite its section
+> numbers and its permutation-key derivation).
+
 The mode used by **Pro-tier** Stecho. The carrier is a Stecho JPEG whose
 embedded payload is wrapped in AES-256-GCM under a password-derived key,
 and laid out in DCT-coefficient LSBs in a password-derived permuted

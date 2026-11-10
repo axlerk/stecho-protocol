@@ -1,18 +1,19 @@
 # Test Vectors
 
 JPEG carriers + expected `(mode, type_tag, body)` triples for Stecho
-layer v1 and layer v2.
+layer v2. Layer v1 was retired on 2026-11-10 and has no vectors here (see
+[`../README.md`](../README.md), "Retired: layer v1").
 The reference Python decoder verifies that an implementation written
 from the spec alone recovers the same payload the encoder embedded.
 
 ## Layout
 
-- `manifest.json` — index of vectors with layer (`v1` / `v2`), mode,
+- `manifest.json` — index of vectors with layer (`v2`), mode,
   password, type, body (base64). v2 entries also give the rung the
   decoder must find, the cover size `cover_n` (non-zero AC count), the
   stream size `stream_bytes`, the cost function the encoder used and the
   number of coefficients it changed — for debugging another decoder.
-- `*.jpg`         — encoded carriers, one per vector (`v2-*` for layer v2).
+- `*.jpg`         — encoded carriers, one per vector (`v2-*`).
 
 ## Status
 
@@ -25,24 +26,9 @@ that the Python decoder must read.
 
 ## Vectors
 
-### Layer v1 (frozen)
-
-| Name                          | Mode    | Type  | Body                          |
-|-------------------------------|---------|-------|-------------------------------|
-| `open-text-hello-ascii`       | open    | text  | `"hello world"`               |
-| `open-empty`                  | open    | text  | `""`                          |
-| `stealth-text-hello-ascii`    | stealth | text  | `"hello world"`               |
-| `stealth-text-unicode`        | stealth | text  | `"Привет, Stecho! 👋"`        |
-| `stealth-audio-binary`        | stealth | audio | 200 bytes of pseudo-random    |
-
-Carriers are synthetic 256×256 gradient + reproducible-seed noise
-JPEGs. Real-world iPhone photo carriers will produce larger n and
-correspondingly higher capacity — these vectors only test the wire
-format, not capacity behavior.
-
 ### Layer v2
 
-Emitted 2026-11-04 by `generate_test_vectors.py` (default `--layer v2`).
+Emitted 2026-11-04 by `generate_test_vectors.py` .
 They cover both modes, all five rungs, text and audio, J-UNIWARD and
 SI-UNIWARD carriers, a grayscale carrier, a carrier with partial MCUs, an
 empty body, and a message deliberately placed above the smallest rung that
@@ -71,10 +57,13 @@ tables and embedded with SI-UNIWARD. Audio bodies are pseudo-random bytes
 labelled `audio`, not real Opus (the Opus container is outside the spec,
 layer O5).
 
-The Swift test copy in `StechoTests/Fixtures/` holds the v1 and v2 sets
-and the manifest; `CrossImplVectorsTests` decodes every entry with the
-shipping Swift dispatch and checks mode, layer, rung and body, and that
-stealth entries open neither without their password nor with a wrong one.
+The Swift test copy in `StechoTests/Fixtures/` holds this set and the
+manifest; `CrossImplVectorsTests` decodes every entry with the shipping
+Swift dispatch and checks mode, layer, rung and body, and that stealth
+entries open neither without their password nor with a wrong one. The two
+`retired-v1-*.jpg` files next to them are not part of this set: they are
+layer-v1 carriers kept only as negative fixtures, asserting that the
+shipping decoder reads them as "no payload".
 
 ### Swift-emitted layer v2 (`swift-v2/`)
 
@@ -96,7 +85,7 @@ python verify_test_vectors.py ../../test-vectors/swift-v2
 ## Why vectors are committed as binary
 
 Each stealth vector embeds a freshly-random AES salt and nonce
-(`stealth-v1.md` §4), and the open-mode padding is random too. The
+(`stealth-v2.md` §6), and the open-mode padding is random too. The
 JPEG bytes therefore differ across runs even for the same
 `(carrier, password, body)` triple. The committed `.jpg` is the
 artifact; the manifest captures only what is decoder-deterministic

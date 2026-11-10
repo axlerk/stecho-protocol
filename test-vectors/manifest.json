@@ -1,63 +1,8 @@
 {
   "generator": "spec/reference/python/generate_test_vectors.py",
-  "spec_version": "juniward-layer (v1 + v2) + open-v1 + stealth-v1 + open-v2 + stealth-v2",
-  "notes": "Vectors emitted by the Python reference encoder. Each entry names its layer: v1 entries are the frozen v1 batch, v2 entries the v2 batch. The Python decoder must read vectors from any conforming encoder.",
+  "spec_version": "juniward-layer (v2) + open-v2 + stealth-v2",
+  "notes": "Vectors emitted by the Python reference encoder, all layer v2. Layer v1 was retired on 2026-11-10 and its vectors were removed. The Python decoder must read vectors from any conforming encoder.",
   "vectors": [
-    {
-      "name": "open-text-hello-ascii",
-      "jpeg": "open-text-hello-ascii.jpg",
-      "carrier_size": "256x256 synthetic",
-      "mode": "open",
-      "password": null,
-      "type": "text",
-      "body_base64": "aGVsbG8gd29ybGQ=",
-      "notes": "Smallest open-mode vector: tiny ASCII payload.",
-      "layer": "v1"
-    },
-    {
-      "name": "open-empty",
-      "jpeg": "open-empty.jpg",
-      "carrier_size": "256x256 synthetic",
-      "mode": "open",
-      "password": null,
-      "type": "text",
-      "body_base64": "",
-      "notes": "Zero-length open-mode payload — header only, all padding.",
-      "layer": "v1"
-    },
-    {
-      "name": "stealth-text-hello-ascii",
-      "jpeg": "stealth-text-hello-ascii.jpg",
-      "carrier_size": "256x256 synthetic",
-      "mode": "stealth",
-      "password": "correct horse battery staple",
-      "type": "text",
-      "body_base64": "aGVsbG8gd29ybGQ=",
-      "notes": "Smallest stealth-mode vector.",
-      "layer": "v1"
-    },
-    {
-      "name": "stealth-text-unicode",
-      "jpeg": "stealth-text-unicode.jpg",
-      "carrier_size": "256x256 synthetic",
-      "mode": "stealth",
-      "password": "пар0ль",
-      "type": "text",
-      "body_base64": "0J/RgNC40LLQtdGCLCBTdGVjaG8hIPCfkYs=",
-      "notes": "UTF-8 body with Cyrillic + emoji and a non-ASCII password.",
-      "layer": "v1"
-    },
-    {
-      "name": "stealth-audio-binary",
-      "jpeg": "stealth-audio-binary.jpg",
-      "carrier_size": "256x256 synthetic",
-      "mode": "stealth",
-      "password": "voice-test",
-      "type": "audio",
-      "body_base64": "UP4PgK4LIvG+6UJ/7AGCmIB+CVCaw7uWLIFYdUlMybbw4+Lw1uHrPpFFvIzyK0yhFjkJze8hKEM+1mAilZ0WZb9UI8WjqPmnGhXJGJ1LstuxrUd8W1qlNCxxag1H3dn76qF2HN9zdy/eGxoef/Xtq6KLNot9BJv9LzBC7kCJzNRpjsuxAsc/wPn0yTFcDovWcTMw+BUmLOonKnlxJMTqD/7rtvketWaleEZMn+XAwVMWBBo6Hi545fmXS+cuapkRq3251gcljYc=",
-      "notes": "200 bytes of pseudo-random bytes labeled as audio — stands in for real Opus.",
-      "layer": "v1"
-    },
     {
       "name": "v2-open-text-hello",
       "layer": "v2",
