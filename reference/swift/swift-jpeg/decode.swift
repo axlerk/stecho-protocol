@@ -2,6 +2,19 @@
 License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+// Patched for Stecho (each patch is marked "Patched for Stecho" where it is):
+// - the first scan extends the image past the frame header only when the
+//   frame height is 0 (`extend: first && frame!.size.y == 0`);
+// - a height redefinition (DNL) segment is refused, never honoured
+//   (security review 2026-11-15);
+// - progressive restart intervals clamp both ends of the row range, so
+//   surplus intervals cannot build an inverted Range (security review
+//   2026-11-15).
+// - restart intervals that start past the last block are not decoded, and
+//   a scan with more intervals than the image has blocks is refused while
+//   it is lexed, so a flood of them costs neither Huffman rebuilds nor
+//   memory (security review 2026-11-15).
+
 // binary utilities 
 
 /// protocol JPEG.Bytestream.Source 
@@ -3006,8 +3019,11 @@ extension JPEG.Data.Spectral.Plane
     mutating 
     func decode(_ data:[UInt8], blocks:Range<Int>, bit a:Int) throws 
     {
-        let rows:Range<Int>     = blocks.lowerBound / self.units.x ..< 
-                        Swift.min(blocks.upperBound / self.units.x, self.units.y)
+        // Patched for Stecho (security review 2026-11-15): clamp both ends, as the
+        // sequential variants do. Surplus restart intervals put the lower bound past
+        // the last row, and `lower ..< min(upper, units.y)` was then an inverted Range (a trap).
+        let rows:Range<Int>     = (blocks.lowerBound / self.units.x ..< blocks.upperBound / self.units.x)
+            .clamped(to: 0 ..< self.units.y)
         let bits:JPEG.Bitstream = .init(data)
         var b:Int               = 0
         for (x, y):(Int, Int) in (0, rows.lowerBound) ..< (self.units.x, rows.upperBound)
@@ -3028,8 +3044,11 @@ extension JPEG.Data.Spectral.Plane
             throw JPEG.DecodingError.undefinedScanHuffmanACReference(component.selector.ac)
         }
         
-        let rows:Range<Int>     = blocks.lowerBound / self.units.x ..< 
-                        Swift.min(blocks.upperBound / self.units.x, self.units.y)
+        // Patched for Stecho (security review 2026-11-15): clamp both ends, as the
+        // sequential variants do. Surplus restart intervals put the lower bound past
+        // the last row, and `lower ..< min(upper, units.y)` was then an inverted Range (a trap).
+        let rows:Range<Int>     = (blocks.lowerBound / self.units.x ..< blocks.upperBound / self.units.x)
+            .clamped(to: 0 ..< self.units.y)
         let bits:JPEG.Bitstream = .init(data)
         var b:Int               = 0, 
             skip:Int            = 0
@@ -3079,8 +3098,11 @@ extension JPEG.Data.Spectral.Plane
             throw JPEG.DecodingError.undefinedScanHuffmanACReference(component.selector.ac)
         }
         
-        let rows:Range<Int>     = blocks.lowerBound / self.units.x ..< 
-                        Swift.min(blocks.upperBound / self.units.x, self.units.y)
+        // Patched for Stecho (security review 2026-11-15): clamp both ends, as the
+        // sequential variants do. Surplus restart intervals put the lower bound past
+        // the last row, and `lower ..< min(upper, units.y)` was then an inverted Range (a trap).
+        let rows:Range<Int>     = (blocks.lowerBound / self.units.x ..< blocks.upperBound / self.units.x)
+            .clamped(to: 0 ..< self.units.y)
         let bits:JPEG.Bitstream = .init(data)
         var b:Int               = 0, 
             skip:Int            = 0
@@ -3418,8 +3440,11 @@ extension JPEG.Data.Spectral
             return (self.indices ~= $0.c ? $0.c : nil, factor)
         }
         
-        let rows:Range<Int>     = blocks.lowerBound / self.blocks.x ..< 
-                        Swift.min(blocks.upperBound / self.blocks.x, self.blocks.y)
+        // Patched for Stecho (security review 2026-11-15): clamp both ends, as the
+        // sequential variants do. Surplus restart intervals put the lower bound past
+        // the last row, and `lower ..< min(upper, blocks.y)` was then an inverted Range (a trap).
+        let rows:Range<Int>     = (blocks.lowerBound / self.blocks.x ..< blocks.upperBound / self.blocks.x)
+            .clamped(to: 0 ..< self.blocks.y)
         let bits:JPEG.Bitstream = .init(data)
         var b:Int               = 0
         for (mx, my):(Int, Int) in (0, rows.lowerBound) ..< (self.blocks.x, rows.upperBound)
@@ -3497,8 +3522,19 @@ extension JPEG.Data.Spectral
             break
         }
         
+        // Patched for Stecho (security review 2026-11-15): a restart interval that
+        // starts past the last block of every plane decodes nothing, but each one
+        // still rebuilt the scan's Huffman tables; an 8 MB file of ~2.8 million such
+        // intervals took 3.6 s on a Mac. Stop at the first one (an encoder never
+        // writes them). A plane's block count bounds an interleaved scan's MCU
+        // count too. Not applied while the image may still grow (`extend`).
+        let lastBlock:Int = self.indices.map { self[$0].units.x * self[$0].units.y }.max() ?? 0
         for (start, data):(Int, [UInt8]) in zip(stride(from: 0, to: .max, by: interval), ecss) 
         {
+            if !extend, start >= lastBlock 
+            {
+                break 
+            }
             let blocks:Range<Int> = start ..< start + interval
             switch (initial: scan.bits.upperBound == .max, band: scan.band)
             {
@@ -3893,11 +3929,25 @@ extension JPEG.Context
                 let scan:JPEG.Header.Scan   = try .parse(marker.data, 
                     process: context.spectral.layout.process)
                 var ecss:[[UInt8]] = []
+                // Patched for Stecho (security review 2026-11-15): a scan cannot use
+                // more restart intervals than the image has blocks (one block per
+                // interval at the least), so lexing stops there instead of
+                // collecting millions of them from a hostile file. Not applied while
+                // the image may still grow.
+                let segmentLimit:Int = context.spectral.indices.map
+                {
+                    context.spectral[$0].units.x * context.spectral[$0].units.y
+                }.max().map { $0 + 1 } ?? .max
+                let growing:Bool = first && (frame?.size.y ?? 0) == 0
                 for index:Int in 0...
                 {
                     let ecs:[UInt8]
                     (ecs, marker) = try stream.segment(prefix: true)
                     ecss.append(ecs)
+                    if !growing, ecss.count > segmentLimit 
+                    {
+                        throw JPEG.DecodingError.unexpectedRestart
+                    }
                     guard case .restart(let phase) = marker.type
                     else
                     {
@@ -3915,10 +3965,17 @@ extension JPEG.Context
                         if first 
                         {
                             let height:JPEG.Header.HeightRedefinition
+                            // Patched for Stecho (security review 2026-11-15): a DNL
+                            // (height redefinition) is refused, never honoured. Upstream
+                            // accepted one after the first scan even with a non-zero
+                            // frame height, and `Plane.set(height:)` then grew every
+                            // plane to `64 * units.x * y` coefficients with no bound, so
+                            // a ~2 KB file could ask for gigabytes. JPEGIngressPolicy
+                            // already refuses a frame height of 0, the only case a DNL
+                            // is for, so no file Stecho accepts needs one.
                             if case .height = marker.type 
                             {
-                                height = try .parse(marker.data)
-                                marker = try stream.segment() 
+                                throw JPEG.DecodingError.unexpectedHeightRedefinitionSegment
                             }
                             // same guarantees for `!` as before
                             else if frame!.size.y > 0

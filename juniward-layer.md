@@ -497,7 +497,7 @@ What v2 changes at this layer:
 
 Not defended, as in v1: a CNN-class detector trained on our carriers is
 not yet measured and may do much better than the simulated detectors;
-transport recompression destroys the payload (`THREAT_MODEL.md` §4.3).
+transport recompression destroys the payload (`THREAT_MODEL.md` §3.4).
 
 ## V2.13 Glossary (v2 additions)
 
@@ -833,7 +833,7 @@ This section restates only what J-UNIWARD + STC give us at this layer.
   reaches the recipient with quantized DCT coefficients preserved
   byte-for-byte. iMessage attachment recompression behaviour is
   observation-level, not security-guarantee — see
-  [`THREAT_MODEL.md`](THREAT_MODEL.md) §4.3 for the threat-model
+  [`THREAT_MODEL.md`](THREAT_MODEL.md) §3.4 for the threat-model
   statement of this failure mode.
 
 ## 9. Glossary

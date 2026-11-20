@@ -1,11 +1,11 @@
 # Stecho — Privacy Policy
 
-_Last updated: 13 May 2026_
+_Last updated: 20 November 2026_
 
-Stecho is an iOS app and iMessage extension that hides short voice
-notes or short text inside ordinary JPEG photos using on-device
-steganography (J-UNIWARD + STC) and AES-256-GCM encryption. This
-document describes what data Stecho does and does not collect.
+Stecho is an iOS app and iMessage extension that hides a voice note,
+a text or a location inside an ordinary photo using on-device
+steganography and encryption. This document describes what data
+Stecho does and does not collect.
 
 ## TL;DR
 
@@ -24,7 +24,7 @@ or to any third party for our own use.
 
 | What | Where | Encrypted at rest |
 |---|---|---|
-| Saved partner password (if you enable it) | iOS Keychain | Yes (Keychain) |
+| Passwords you choose to save, with the name you give each one and the chats it is for | iOS Keychain, this device only | Yes (Keychain) |
 | App settings (encryption on/off, biometrics on/off, etc.) | App Group `UserDefaults` | No |
 | Voice notes you record before sending | App Group container (transient — discarded once sent or composer dismissed) | No (iOS file protection only) |
 
@@ -33,7 +33,10 @@ carriers — they come from your iOS Photos library or camera each time,
 are converted to a steganographic JPEG in memory, and the result is
 handed straight to iMessage. The original photo is unaffected.
 
-Removing the app removes everything in the table above.
+Deleting the app removes everything in the App Group container. iOS
+keeps Keychain items after an app is deleted; Stecho erases its saved
+passwords the next time it is installed on this device. Until then they
+stay in this device's Keychain, where no other app can read them.
 
 ## Outbound network requests
 
@@ -46,13 +49,21 @@ control.
 Stecho never uploads your voice notes, text, photos, location, or any
 other user-generated content to any server.
 
+## Location
+
+Stecho requests location access only when you tap the location button
+inside the iMessage extension. The coordinates are embedded as part of
+the hidden message inside the photo you are about to send. If you deny
+the permission, every other Stecho feature continues to work.
+
 ## Camera and Photos library
 
 Stecho requests Photos library access only when you choose a photo
 from your library as a carrier, and Camera access only when you choose
-to take a fresh photo in the moment. In both cases the image is
-processed on device. If you deny either permission, the other input
-sources remain available.
+to take a fresh photo in the moment, or to scan a partner's QR code
+when you pair a shared password. In every case the image is processed
+on device. If you deny either permission, the other input sources
+remain available.
 
 ## Microphone
 
@@ -63,34 +74,35 @@ recording is discarded once the message is sent.
 
 ## Face ID / Touch ID
 
-Stecho uses biometric authentication only to gate access to settings
-and saved passwords on your device. Authentication happens entirely
+Stecho uses biometric authentication only to gate its settings and
+saved passwords and, if you turn it on, writing and reading secrets in
+the iMessage extension. Authentication happens entirely
 through Apple's `LocalAuthentication` framework; Stecho never sees
 your biometric data.
 
 ## Purchases
 
-In-app purchases (Stecho Pro monthly, yearly, lifetime, and Donate)
-are processed by Apple via StoreKit. Stecho sees only an anonymous
-entitlement flag indicating whether you have an active subscription.
+In-app purchases (Stecho Pro monthly, yearly and lifetime, and Donate)
+are processed by Apple via StoreKit. Stecho sees only
+which of its products your Apple Account owns, as StoreKit reports it on
+the device.
 We do not receive your name, email, payment details, or App Store
 account.
 
 ## What Stecho cannot protect against
 
-For completeness — and because Stecho is a security-adjacent tool —
-the threat model is documented in detail at
-<https://github.com/axlerk/Stecho/blob/main/THREAT_MODEL.md>. Short
-version: Stecho protects message *content* (AES-256-GCM,
-PBKDF2-600k); it does **not** claim to defeat trained
-steganalysis-class adversaries who can detect that *some* hiding has
-happened, nor does it survive device-level compromise (forensic
-extraction, spyware).
+The full list is in the threat model:
+<https://github.com/axlerk/stecho-protocol/blob/main/THREAT_MODEL.md>.
+Short version: with a password, Stecho protects what the message says
+(AES-256-GCM, key derived with PBKDF2, 600 000 iterations). It does not
+hide from statistical analysis that a photo may carry something, and it
+cannot protect a phone that someone else can unlock or that runs
+spyware.
 
 ## Children
 
 Stecho is not directed at children under 13 and does not knowingly
-collect data from them. Age rating: 12+.
+collect data from them. Age rating: 4+.
 
 ## Changes to this policy
 

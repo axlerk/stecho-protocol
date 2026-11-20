@@ -355,8 +355,8 @@ properties (see [`juniward-layer.md`](juniward-layer.md) §8).
   hide *the fact* of an embedding; it hides *the content*.
 - **iMessage transport recompression.** Spec assumes the carrier
   reaches the recipient with DCT coefficients preserved byte-for-byte.
-  See [`THREAT_MODEL.md`](THREAT_MODEL.md) §4.3 for the failure
-  mode and §6.3 for the MMS downgrade case.
+  See [`THREAT_MODEL.md`](THREAT_MODEL.md) §3.4 for the failure
+  mode and for the MMS case.
 - **Forward secrecy.** A password leak retroactively decrypts every
   prior stealth-mode message under that password.
 

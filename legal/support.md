@@ -3,25 +3,32 @@
 ## What is Stecho?
 
 Stecho is an iOS app and iMessage extension that lets you hide a
-short voice note or short text inside an ordinary JPEG photo. The
-recipient sees a normal photo; if you have stealth mode enabled, you
-and they share a password to reveal what's hidden inside.
+secret message — a voice note, a text or a location — inside an
+ordinary photo. The recipient sees a normal photo until they reveal it
+in Stecho. A free secret is hidden but not encrypted: anyone with
+Stecho can read it. With Stecho Pro you can lock it with a password
+that you and the recipient share; to read a locked secret, the
+recipient needs Stecho Pro and that password too.
 
 ## Quick start
 
 1. Install Stecho from the App Store.
 2. Open Messages → tap the apps drawer → choose Stecho.
-3. Pick a photo (camera, library, or paste from clipboard).
-4. Tap **Record** to record a voice note, or **Text** to type a short
-   message.
-5. (Optional but recommended) Turn on encryption in the main Stecho
-   app and set a password you and your partner already know.
-6. Tap send. The recipient taps the photo inside Messages and opens
-   it with Stecho to play the voice note or read the text.
+3. Pick a photo: **Camera**, **Photos** or **Clipboard**.
+4. Choose **Voice** and record a voice note, or **Text** and type a
+   message. Tap **Add**, then send the photo as usual.
+5. (Optional, Pro) Turn on encryption in Stecho's settings. From then
+   on the screen where you record or type has a password field: type
+   a password you and your partner already know, or agree a new one
+   face to face with **Pair in Person** in settings. Your partner
+   needs Pro as well to read it.
+6. To read it, the recipient opens Stecho in Messages, touches and
+   holds the photo in the conversation, and drags it into the Stecho
+   panel.
 
 For a deeper walkthrough of the cryptography, the wire format, and an
-independent Python reference decoder, see the spec in the project
-repository.
+independent reference decoder in Python, see
+<https://github.com/axlerk/stecho-protocol>.
 
 ## Frequently asked questions
 
@@ -31,42 +38,41 @@ no accounts.
 
 **Q: What encryption does it use?**
 AES-256-GCM with a key derived from your password via PBKDF2-SHA256
-(600 000 iterations). Open mode (the free tier) hides bytes inside the
-photo's DCT coefficients but does not encrypt them; encryption
-requires Stecho Pro.
+(600 000 iterations). Open mode (the free tier) hides the message but
+does not encrypt it; encryption requires Stecho Pro.
 
 **Q: Can someone tell a photo has a secret in it?**
-The free **open mode** is steganographic but easy to detect with any
-J-UNIWARD-aware tool — it is meant for fun, not adversarial use.
-**Stealth mode** (Pro) hides the wire-format fingerprint (no magic
-bytes, password-derived permutation) and encrypts the content, but
-trained statistical steganalysis (J-UNIWARD-aware CNN classifiers)
-can still detect *that some hiding happened* with non-trivial
-accuracy. The *content* remains protected by AES-256-GCM. The full
-threat model is published in the project's `THREAT_MODEL.md`.
+Open mode (free) is meant for fun: anyone with Stecho — or the
+public reference decoder — can read it. Stealth mode (Pro, with a
+password) carries no fixed marker for a scanner to look for, and
+without the password its content stays hidden. It does not hide that
+the photo was modified: statistical steganalysis tools can flag it as
+a likely carrier. The threat model in the repository above spells out
+what is and is not protected.
 
-**Q: Why JPEG photos and not stickers / HEIC / PNG?**
-JPEG attachments survive iMessage's transport pipeline without being
-recompressed end-to-end on current iOS versions. Stickers (`MSSticker`)
-are re-encoded in transit and cannot carry hidden bytes. HEIC and PNG
-also have transport-survival issues for our embedding rate. JPEG is
-the only Apple-blessed image carrier that works for the product.
+**Q: Does the hidden message survive being sent?**
+Over iMessage, in our tests, yes. Stecho needs the photo to arrive
+exactly as it left, so it saves every photo the way the iPhone itself
+shares photos, and Messages has delivered those files unchanged. That
+is what we observed, not a promise from Apple: if a future iOS changes
+it, the photo arrives as an ordinary photo and Stecho finds no message
+in it.
 
 **Q: My recipient is on Android — does this still work?**
-No. If iMessage downgrades to MMS/SMS for the conversation, the
-attachment is re-compressed and the hidden payload is destroyed.
-Stecho is iMessage-to-iMessage only.
+No. Stecho works iMessage to iMessage only. A photo that goes out as
+SMS/MMS, or through another messenger, should be expected to arrive
+without its hidden message.
 
 **Q: I lost my password.**
-We cannot recover it. The password never leaves your device, and
-without it the hidden content is unrecoverable.
+We cannot recover it. Stecho keeps it only in this device's Keychain —
+never on a server — and it leaves the device only if you share it with
+a partner through QR pairing. Without it the secret is unrecoverable.
 
 **Q: I'm in Russia and the App Store won't let me pay.**
 All Pro features are unlocked automatically when your iPhone's primary
-system language (iOS Settings → General → Language & Region → iPhone
-Language) is set to Russian. The per-app language override (iOS
-Settings → Stecho → Language) is intentionally **not** counted —
-only the system-level language unlocks free Pro.
+language is Russian — the first language in Settings → General →
+Language & Region. Setting Russian only for Stecho (Settings → Stecho →
+Language) does not unlock them.
 
 ## Contact
 
