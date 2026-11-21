@@ -6,7 +6,7 @@ TestFlight build (2026-11-10) is behind it. Formats: embedding layer v2 with
 `open-v2` and `stealth-v2`; the layer is a draft until the specification
 freezes it. Last checked against the code on 2026-11-20. Detection of the
 app's own photos was measured on three sets of 120 on 2026-11-20/21 (§3.1);
-the levels' wording inside the app still rests on an earlier simulation.
+the levels inside the app follow the set of camera photos (2026-11-21).
 
 This document says what Stecho protects, what it does not, and how we know.
 Read it before you trust the app with anything that matters.
@@ -200,10 +200,13 @@ library, with no people in the foreground.
 - **Hidden stayed close to a coin flip on camera photos** (0.57 at most, upper
   ends up to 0.59) and reached 0.67 on the smallest set. Read that as "hard
   to flag on these photos", not as "safe".
-- **What the app says about the levels is older than these numbers.** Its
-  level descriptions, the Balanced card's "hard to tell" among them, rest on a
-  simulation of the engine (`experiment-steganalysis-v2-sim.md`: worst score
-  0.583 at Balanced and 0.502 at Hidden, 3024 px), not on the sets above.
+- **What the app shows follows the camera photos.** Since 2026-11-21 its
+  levels come from the 120 camera photos by one rule: the upper end of the
+  worst test's interval, a score below chance read the other way. Hidden
+  shows "hard to tell" (0.59), Balanced "some tests notice" (0.64), Long "a
+  simple test can tell" (0.99), all at 3024 px. The two sets of other photos
+  score higher at Hidden and Balanced, so on such photos the app's levels are
+  generous.
 - **Smooth pictures are much easier to flag.** At Balanced the untrained
   test scored 0.84 on synthetic images and 0.98 on wallpaper crops (12 of
   each, 2026-11-07/08).
@@ -366,15 +369,19 @@ tracking service: it imports Apple's frameworks and the Opus audio codec,
 nothing else (read 2026-11-20). Purchases go through Apple's App Store. It
 does show maps, and maps come from Apple.
 
-**A map preview reaches Apple Maps without a tap.** When a revealed text
+**A map preview reaches Apple Maps only when you ask.** When a revealed text
 holds coordinates (an attached location, `geo:`, or a map link with
-coordinates in it), the reading screen draws a map preview at once: Apple's
-map servers receive the area around the coordinates, from the recipient's
-IP, at the moment of reading. On the sending side the location picker loads
-map tiles, and place search sends what is typed to Apple. Stecho itself
-sends the coordinates nowhere. For a message that *is* a place, the area
-Apple sees is most of what it says; to keep a place away from Apple, send it
-as plain text, not as an attached location or a map link.
+coordinates in it), the reading screen shows the coordinates and a "Show map"
+button; nothing is requested before that tap, and the tap asks first. After
+"Show map" Apple's map servers receive the area around the coordinates, from
+the recipient's IP, at that moment; the message itself is not sent. "Always show
+maps" on that question, or the switch in Settings, brings back the old
+behaviour, where the map is drawn as soon as the message is read (builds up to
+2026-11-21 did this for everyone). On the sending side the location picker
+loads map tiles, and place search sends what is typed to Apple. Stecho itself
+sends the coordinates nowhere. For a message that *is* a place, the area Apple
+sees is most of what it says; to keep a place away from Apple, do not tap
+"Show map", or send it as plain text.
 
 **A tap on the preview opens a Safari sheet** inside Messages:
 
