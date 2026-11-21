@@ -4,7 +4,9 @@
 the current code and says, in the place where it matters, where the latest
 TestFlight build (2026-11-10) is behind it. Formats: embedding layer v2 with
 `open-v2` and `stealth-v2`; the layer is a draft until the specification
-freezes it. Last checked against the code on 2026-11-20.
+freezes it. Last checked against the code on 2026-11-20. Detection of the
+app's own photos was measured on three sets of 120 on 2026-11-20/21 (§3.1);
+the levels' wording inside the app still rests on an earlier simulation.
 
 This document says what Stecho protects, what it does not, and how we know.
 Read it before you trust the app with anything that matters.
@@ -160,39 +162,55 @@ rate.
 simulator, against Apple's encode of the same picture. The score is AUC: 0.5
 is a coin flip, 1.0 is caught every time. Records:
 `experiment-steganalysis-v2-si.md` for the first two sets,
-`experiment-steganalysis-v2-app.md` for the third.
+`experiment-steganalysis-v2-app.md` for the last three. Each cell is
+trained / untrained; a range spans the sizes or crops.
 
-| Level | Detector | 8 photos, iPhone 15 Pro, 2026-11-07/08 | 59 photos, iPhone 15 Pro and 12 mini, 2026-11-09 | 120 photos, ten iPhone 14 Pro, 2026-11-20 |
-|---|---|---|---|---|
-| Hidden, and short messages at any level | trained | 0.49–0.54 | 0.52 | 0.53–0.54 |
-| | untrained | 0.52–0.67 | 0.55–0.57 | 0.51–0.54 |
-| Balanced (the default) | trained | 0.52–0.54 | 0.55 | 0.57 |
-| | untrained | 0.50–0.69 | 0.53 | 0.66 at 3024 px, 0.75 at 2048 px |
-| Long | trained | 0.59–0.71 | 0.68 | 0.76–0.77 |
-| | untrained | 0.98–1.00 | 0.98 | 0.97–1.00 |
+| Photos | Hidden, and short messages at any level | Balanced (the default) | Long |
+|---|---|---|---|
+| 8, iPhone 15 Pro, 2026-11-07/08 | 0.49–0.54 / 0.52–0.67 | 0.52–0.54 / 0.50–0.69 | 0.59–0.71 / 0.98–1.00 |
+| 59, iPhone 15 Pro and 12 mini, 2026-11-09 | 0.52 / 0.55–0.57 | 0.55 / 0.53 | 0.68 / 0.98 |
+| 120, ten iPhone 14 Pro (a public research set), 2026-11-20 | 0.53–0.54 / 0.51–0.54 | 0.57 / 0.66–0.75 | 0.76–0.77 / 0.97–1.00 |
+| 120, iPhone 15 Pro and 12 mini, 2026-11-21 | 0.53 / 0.55–0.57 | 0.55–0.57 / 0.60–0.67 | 0.71–0.80 / 0.97–0.99 |
+| 120 JPEGs saved from messengers or the web, 2026-11-21 | 0.58 / 0.56–0.57 | 0.61–0.62 / 0.59 | 0.67–0.68 / 0.68–0.72 |
+
+On the three sets of 120, the upper end of the 95 % interval of the worst
+detector, over both sizes:
+
+| Level | iPhone 14 Pro set | iPhone 15 Pro and 12 mini | Saved JPEGs |
+|---|---|---|---|
+| Hidden | 0.57, untrained | 0.59, untrained | 0.62, trained |
+| Balanced | 0.79, untrained | 0.71, untrained | 0.66, trained |
+| Long | 1.00, untrained | 1.00, untrained | 0.76, untrained |
 
 The untrained test is the F5 calibration attack of 2002, a few dozen lines
 of code. The trained one is a DCTR feature set with a linear classifier:
 trained on 72 sources for the first set, cross-validated on the set itself
-for the other two. The first set is whole photos and crops at 2048 and 3024
-px; the second is whole photos at 3024 px; the third, from a public research
-collection, at both sizes.
+for the others. The first set is whole photos and crops at 2048 and 3024
+px; the second is whole photos at 3024 px; the last three are whole photos
+at both sizes. The two sets of our own were drawn at random from one
+library, with no people in the foreground.
 
 - **A Long message is caught** by a published test with no training, on
-  every set. The app says so when a message passes the Balanced line.
-- **Balanced depends on the photos.** The untrained test scored 0.53 on our
-  own 59 photos and 0.66 to 0.75 on the 120 from iPhone 14 Pro phones. Why
-  they differ was not measured†, and we do not say which is typical.
-- **Hidden stayed near a coin flip on the two larger sets** (0.57 at most)
-  and reached 0.67 on the smallest. Read that as "hard to flag on these
-  photos", not as "safe".
+  every set of camera photos (0.97 to 1.00); on photos that were already
+  JPEGs it scored 0.68–0.72. The app says so when a message passes the
+  Balanced line.
+- **Balanced is easier to flag on every set of 120**: worst scores 0.62 to
+  0.75, upper ends 0.66 to 0.79. The 0.53 on our own 59 photos did not hold
+  on 120 of them.
+- **Hidden stayed close to a coin flip on camera photos** (0.57 at most, upper
+  ends up to 0.59) and reached 0.67 on the smallest set. Read that as "hard
+  to flag on these photos", not as "safe".
+- **What the app says about the levels is older than these numbers.** Its
+  level descriptions, the Balanced card's "hard to tell" among them, rest on a
+  simulation of the engine (`experiment-steganalysis-v2-sim.md`: worst score
+  0.583 at Balanced and 0.502 at Hidden, 3024 px), not on the sets above.
 - **Smooth pictures are much easier to flag.** At Balanced the untrained
   test scored 0.84 on synthetic images and 0.98 on wallpaper crops (12 of
   each, 2026-11-07/08).
-- **Photos that were already JPEGs at the carrier size** (24 of them,
-  2026-11-07/08): the trained detector scored 0.51–0.53 up to Balanced and
-  0.62 at Long. The untrained test does not work on them at all, with or
-  without a message, so they are less well covered.
+- **Photos that were already JPEGs** (120 saved from messengers or the web,
+  no camera data, 2026-11-21): the trained detector sees the low levels
+  better than on camera photos (0.58 at Hidden, upper end 0.62) and Long
+  worse (0.67–0.68). Why was not measured†.
 - **Stronger detectors exist.** No network has been trained on Stecho
   photos†. Four published, pretrained networks did no better than the
   detectors above on simulated photos (2026-11-04,
@@ -459,7 +477,7 @@ sibling only:
 - the chat identifiers after a reinstall or an update (§4.3): measured for
   Stiger, which shares the code, and for a TestFlight update only;
 - a detector trained on Stecho photos and a test written for layer v2
-  (§3.1); why Balanced scores differently on the 59 and the 120 photos; that
+  (§3.1); why photos that were already JPEGs show the low levels more; that
   open and stealth photos are equally detectable: inferred from the format;
 - how well the message size can be estimated without the password (§3.2),
   and the file-size figure on the current encoder (§3.3);
